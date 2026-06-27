@@ -1,0 +1,138 @@
+const router = require('express').Router()
+const productController = require('../apis/product/ProductController')
+const categoryController = require('../apis/category/categoryController')
+const BrandController = require('../apis/brand/BrandController')
+const CustomerController = require('../apis/customer/CustomerController')
+const OrderController = require('../apis/order/OrderController')
+const enquiryController = require('../apis/enquiry/EnquiryController')
+const reviewController = require('../apis/review/ReviewController')
+const userController = require('../apis/user/userController')
+const CouponController = require('../apis/coupons/CouponsController')
+const AddressController = require('../apis/address/AddressController')
+const CartController = require('../apis/cart/CartController')
+
+const aiController = require('../apis/aiControler/aiController')
+// const wishlistController = require('../apis/wishList/WishListController')
+const multer = require('multer')
+
+router.post('/product/all', productController.all)
+router.get('/', (req, res) => {
+    res.send("Welcome to Server,Server Activated ! ")
+})
+
+// It is for Offline Disk Storage (using Multer)
+// const storage = multer.diskStorage({
+//   destination: function (req, file, cb) {
+//     cb(null, 'server/public')
+//   },
+//   filename: function (req, file, cb) {
+//     const uniqueSuffix = Date.now()
+//     cb(null,uniqueSuffix  + '-' +  file.originalname)
+//   }
+// })
+
+// In case of Cloudinary
+const storage = multer.memoryStorage()
+const upload = multer({ storage: storage })
+
+//Login
+router.post('/category/all', categoryController.all)
+router.post('/brand/all', BrandController.all)
+router.post("/login", userController.login)
+router.post("/changePassword", userController.changepassword)
+router.use(require("../middleware/AdminTokenChecker"))
+
+
+//Product
+router.post('/product/add', upload.array('image'), productController.add)
+router.post('/product/single', productController.single)
+router.post('/product/update', upload.array('image'), productController.update)
+router.post('/product/DeleteOne', productController.DeleteOne)
+router.post('/product/softDelete', productController.softDelete)
+// router.post('/product/filtercategory', productController.FilterByCategoryId)
+
+
+//category
+// router.use(require("../middleware/AdminTokenChecker"))
+router.post('/category/add', upload.single('image'), categoryController.add)
+router.post('/category/single', categoryController.single)
+router.post('/category/update', upload.single('image'), categoryController.update)
+router.post('/category/DeleteOne', categoryController.DeleteOne)
+router.post('/category/softDelete', categoryController.softDelete)
+
+
+//brand
+router.post('/brand/add', upload.single('logo'), BrandController.add)
+router.post('/brand/single', BrandController.single)
+router.post('/brand/update', upload.single('logo'), BrandController.update)
+router.post('/brand/DeleteOne', BrandController.DeleteOne)
+router.post('/brand/softDelete', BrandController.softDelete)
+
+//Cart
+
+router.post('/cart/single', CartController.single)
+router.post('/cart/update', CartController.update)
+router.post('/cart/DeleteOne', CartController.DeleteOne)
+router.post('/cart/softDelete', CartController.softDelete)
+router.post('/cart/increment', CartController.increment)
+router.post('/cart/decrement', CartController.decrement)
+
+
+
+//enquiry
+router.post('/enquiry/add', enquiryController.add)
+router.post('/enquiry/all', enquiryController.all)
+router.post('/enquiry/single', enquiryController.single)
+router.post('/enquiry/update', enquiryController.update)
+router.post('/enquiry/DeleteOne', enquiryController.DeleteOne)
+router.post('/enquiry/softDelete', enquiryController.softDelete)
+
+
+
+//Customer
+router.post("/customer/Register", CustomerController.Register)
+router.post('/customer/all', CustomerController.all)
+router.post('/customer/single', CustomerController.single)
+router.post('/customer/update', CustomerController.update)
+router.post('/customer/DeleteOne', CustomerController.DeleteOne)
+router.post('/customer/softDelete', CustomerController.softDelete)
+router.post('/customer/toggleBlock',CustomerController.toggleBlock)
+
+
+//Coupon
+router.post('/coupon/add', CouponController.add)
+router.post('/coupon/all', CouponController.all)
+router.post('/coupon/single', CouponController.single)
+router.post('/coupon/update', CouponController.update)
+router.post('/coupon/DeleteOne', CouponController.DeleteOne)
+router.post('/coupon/softDelete', CouponController.softDelete)
+
+//Order
+router.post('/order/count', OrderController.countOrders)
+router.post('/order/all', OrderController.allOrders)
+router.post('/order/single', OrderController.singleOrder)
+router.post('/order/update', OrderController.updateOrderStatus)
+
+//AI integration
+router.post("/aiCall", aiController.main)
+
+
+//Address
+router.post('/address/add', AddressController.add);
+router.post('/address/all', AddressController.all);
+
+// WishList
+// router.post('/wishlist/add',wishlistController.createWishlist)
+// router.post('/wishlist/all',wishlistController.getAll)
+// router.post('/wishlist/single',wishlistController.single)
+// router.post('/wishlist/update',wishlistController.update)
+// router.post('/wishlist/delete',wishlistController.DeleteOne)
+
+// //Vendor
+// router.post('/vendor/all',vendorController.all)
+// router.post('/vendor/single',vendorController.single)
+// router.post('/vendor/update',vendorController.update)
+// router.post('/vendor/DeleteOne',vendorController.DeleteOne)
+// router.post('/vendor/softDelete',vendorController.softDelete)
+
+module.exports = router; 

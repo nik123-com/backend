@@ -1,0 +1,15 @@
+const mongoose = require('mongoose');
+
+const CustomerSchema = new mongoose.Schema({
+    name:{type:String,default:""},
+    email:{type:String, default:""},
+    userId:{type:mongoose.Schema.Types.ObjectId, ref:"user"},
+    Contact:{type:String, default:""},
+    evidence:{type:String, default:""},
+    GovtID:{type:String, default:""},
+    Address:{type:String, default:""},
+    status:{type:Boolean, default:true},
+    created_at:{type:Date, default:Date.now()}
+})
+
+module.exports = mongoose.model('customer', CustomerSchema )
