@@ -21,7 +21,7 @@ router.post("/product/single", productsController.single)
 //Login
 router.post("/Register", CustomerController.Register)
 router.post("/login", userController.login)
-router.use(require("../middleware/CustomerTokenChecker"))
+router.use(require("../middleware/customerTokenChecker"))
 router.post('/category/single', categoryController.single)
 router.post("/product/add", productsController.add)
 

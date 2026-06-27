@@ -1,4 +1,4 @@
-const orderModel = require("./orderModel")
+const orderModel = require("./OrderModel")
 const nodemailer = require("nodemailer");
 const customerModel = require("../customer/CustomerModel")
 const cartModel = require("../cart/CartModel")
