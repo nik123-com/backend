@@ -40,6 +40,8 @@ router.post('/category/all', categoryController.all)
 router.post('/brand/all', BrandController.all)
 router.post("/login", userController.login)
 router.post("/changePassword", userController.changepassword)
+router.post("/forgotPassword", userController.forgotPassword)
+router.post("/resetPassword/:token", userController.resetPassword)
 router.use(require("../middleware/AdminTokenChecker"))
 
 

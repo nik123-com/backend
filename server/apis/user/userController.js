@@ -2,6 +2,8 @@ const userModel = require("../user/userModel")
 const bcrypt = require("bcrypt")
 const jwt = require("jsonwebtoken")
 const Joi = require("joi");
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 
 const skey = "SecreteKey"
 const login = (req, res) => {
@@ -145,4 +147,85 @@ const changepassword = async (req, res) => {
     }
   }
 };
-module.exports = { login,changepassword }
+
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.send({ success: false, status: 400, message: "Email is required" });
+    }
+
+    const user = await userModel.findOne({ email });
+    if (!user) {
+      return res.send({ success: false, status: 404, message: "User not found" });
+    }
+
+    const token = crypto.randomBytes(20).toString("hex");
+    user.resetPasswordToken = token;
+    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+
+    await user.save();
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+
+    const mailOptions = {
+      to: user.email,
+      from: process.env.SMTP_USER,
+      subject: "Password Reset Request",
+      text: `You are receiving this because you (or someone else) have requested the reset of the password for your account.\n\n
+        Please click on the following link, or paste this into your browser to complete the process:\n\n
+        http://localhost:5173/reset-password/${token}\n\n
+        If you did not request this, please ignore this email and your password will remain unchanged.\n`,
+    };
+
+    transporter.sendMail(mailOptions, (err) => {
+      if (err) {
+        console.error("Error sending email:", err);
+        return res.send({ success: false, status: 500, message: "Error sending email" });
+      }
+      res.send({ success: true, status: 200, message: "An e-mail has been sent to " + user.email + " with further instructions." });
+    });
+  } catch (err) {
+    console.error(err);
+    res.send({ success: false, status: 500, message: "Internal server error" });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { newPassword } = req.body;
+
+    const user = await userModel.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.send({ success: false, status: 400, message: "Password reset token is invalid or has expired." });
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+        return res.send({ success: false, status: 400, message: "Password must be at least 6 characters long." });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+
+    await user.save();
+
+    res.send({ success: true, status: 200, message: "Success! Your password has been changed." });
+  } catch (err) {
+    console.error(err);
+    res.send({ success: false, status: 500, message: "Internal server error" });
+  }
+};
+
+module.exports = { login, changepassword, forgotPassword, resetPassword }
