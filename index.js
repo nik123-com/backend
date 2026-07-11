@@ -1,7 +1,7 @@
 require('dotenv').config()    // It help to keep keys in .env file
 const express = require('express');
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 // default route
 app.get('/', (req, res) => {
@@ -12,7 +12,7 @@ var cors = require('cors')
 app.use(cors())
 
 // body - parser for req.body
-app.use(express.urlencoded());
+app.use(express.urlencoded({extended: true}));
 app.use(express.json());
 
 // AdminSeeder 
@@ -39,7 +39,7 @@ app.use("/customer", CustomerRoutes)
 
 
 // for app listening
-app.listen(3000, () => {
+app.listen(port, () => {
     console.log(`listening  port ${port} `);
 })
 
