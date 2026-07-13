@@ -19,7 +19,8 @@ const login = (req, res) => {
         userModel.findOne({ email: req.body.email }).then((userData) => {
             if (userData == null) {
                 res.send({
-                    massage: "user Not found",
+                    massage: "User not found",
+                    message: "User not found",
                     success: false,
                     status: 404
                 })
@@ -50,7 +51,8 @@ const login = (req, res) => {
                     })
                 } else {
                     res.send({
-                        massage: "Invaild password",
+                        massage: "Enter the correct Password",
+                        message: "Enter the correct Password",
                         success: false,
                         status: 404
                     })
