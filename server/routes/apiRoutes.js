@@ -42,6 +42,10 @@ router.post("/login", userController.login)
 router.post("/changePassword", userController.changepassword)
 router.post("/forgotPassword", userController.forgotPassword)
 router.post("/resetPassword/:token", userController.resetPassword)
+
+//AI integration
+router.post("/aiCall", aiController.main)
+
 router.use(require("../middleware/AdminTokenChecker"))
 
 
@@ -114,10 +118,6 @@ router.post('/order/count', OrderController.countOrders)
 router.post('/order/all', OrderController.allOrders)
 router.post('/order/single', OrderController.singleOrder)
 router.post('/order/update', OrderController.updateOrderStatus)
-
-//AI integration
-router.post("/aiCall", aiController.main)
-
 
 //Address
 router.post('/address/add', AddressController.add);
