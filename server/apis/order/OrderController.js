@@ -58,33 +58,28 @@ const addOrder = async (req, res) => {
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
       const transporter = nodemailer.createTransport({
         service: "Gmail",
-        host: "smtp.gmail.com",
-        port: 587,
-        secure: true,
         auth: {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS,
         },
       })
-      try {
-        await transporter.sendMail({
-          from: '"PrimeNest" <manviv1253@gmail.com>',
-          to: customer.email,
-          subject: `Order #${savedOrder.autoId} Confirmed`,
-          html: `
-            <div style="font-family: Arial;">
-              <h2>Order Confirmed</h2>
-              <p>Hi <b>${customer.name || "Customer"}</b>,</p>
-              <p>Your order has been placed successfully.</p>
-              <p><b>Order ID:</b> ${savedOrder.autoId}</p>
-              <p><b>Total Amount:</b> Rs.${grandTotal}</p>
-              <p>We'll notify you once it's shipped.</p>
-              <br/><p>Thanks,<br/>PrimeNest</p>
-            </div>`
-        })
-      } catch (err) {
+      transporter.sendMail({
+        from: '"PrimeNest" <manviv1253@gmail.com>',
+        to: `${customer.email}, nikhilxe@gmail.com`,
+        subject: `Order #${savedOrder.autoId} Confirmed`,
+        html: `
+          <div style="font-family: Arial;">
+            <h2>Order Confirmed</h2>
+            <p>Hi <b>${customer.name || "Customer"}</b>,</p>
+            <p>Your order has been placed successfully.</p>
+            <p><b>Order ID:</b> ${savedOrder.autoId}</p>
+            <p><b>Total Amount:</b> Rs.${grandTotal}</p>
+            <p>We'll notify you once it's shipped.</p>
+            <br/><p>Thanks,<br/>PrimeNest</p>
+          </div>`
+      }).catch((err) => {
         console.error("Email send error:", err)
-      }
+      })
     }
 
     return res.send({ status: 201, success: true, message: "Order Placed Successfully", data: savedOrder })

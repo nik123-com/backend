@@ -44,7 +44,21 @@ const all = async(req,res) =>{
         if(!req.body.userId){
             return res.json({success:false, status:400, message:"User Id is Required"})
         }
-        const allData = await AddressModel.find({editbyid : req.body.userId});
+        let allData = await AddressModel.find({editbyid : req.body.userId});
+        
+        if (allData.length === 0) {
+            const customerModel = require("../customer/CustomerModel");
+            const customer = await customerModel.findOne({ userId: req.body.userId });
+            if (customer && customer.Address) {
+                let defaultAddress = new AddressModel();
+                defaultAddress.houseno = customer.Address;
+                defaultAddress.contact = customer.Contact || "";
+                defaultAddress.editbyid = req.body.userId;
+                await defaultAddress.save();
+                allData = await AddressModel.find({editbyid : req.body.userId});
+            }
+        }
+
         const total = await AddressModel.countDocuments({});
         res.json({
             status:200,

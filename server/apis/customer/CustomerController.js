@@ -66,30 +66,21 @@ const Register = (req, res) => {
           customerobj.save().then(async(customer) => {
 
             const transporter = nodemailer.createTransport({
-              host: "smtp.gmail.com",
-              port: 587,
-              secure: false, 
+              service: "Gmail",
               auth: {
                 user: process.env.SMTP_USER,
                 pass: process.env.SMTP_PASS,
               },
-
             });
-            try {
-              const info = await transporter.sendMail({
-                from: '"Our Team" nikhilxe@gmail.com', // sender address
-                to: {email}, // list of recipients
-                subject: "Regarding Testing", // subject line
-                text: "Someone Registered with your Email Id", // plain text body
-                html: "<b>Someone Registered with your Email Id</b>", // HTML body
-              });
-
-              console.log("Message sent: %s", info.messageId);
-              // Preview URL is only available when using an Ethereal test account
-              console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
-            } catch (err) {
+            transporter.sendMail({
+              from: '"Our Team" <nikhilxe@gmail.com>', // sender address
+              to: customerobj.email, // list of recipients
+              subject: "Regarding Testing", // subject line
+              text: "Someone Registered with your Email Id", // plain text body
+              html: "<b>Someone Registered with your Email Id</b>", // HTML body
+            }).catch((err) => {
               console.error("Error while sending mail:", err);
-            }
+            });
 
             return res.send({
               message: "Customer added successfully",
