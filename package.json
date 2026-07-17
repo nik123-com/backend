@@ -13,7 +13,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@google/genai": "^1.51.0",
+    "@google/genai": "^1.52.0",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.9.0",
     "compression": "^1.8.1",
@@ -22,7 +22,8 @@
     "express": "^5.2.1",
     "joi": "^18.2.1",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.3.2",
+    "mongodb": "^7.5.0",
+    "mongoose": "^9.7.4",
     "multer": "^2.1.1",
     "nodemailer": "^8.0.9",
     "nodemon": "^3.1.14",
