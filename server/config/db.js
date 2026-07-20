@@ -10,8 +10,9 @@ try {
 
 const connectDb = async () => {
     try {
-        await mongoose.connect(process.env.db)
-        console.log("DB Connected")
+        const dbUri = process.env.db || "mongodb+srv://nikhilxe_db_user:Akhil*082@ecommerce.ble8wa5.mongodb.net/";
+        await mongoose.connect(dbUri);
+        console.log("DB Connected");
 
         // Synchronize product ratings with customer reviews
         const ProductModel = require('../apis/product/ProductModel');
