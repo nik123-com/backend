@@ -1,6 +1,15 @@
 const mongoose = require('mongoose');
-const connectDb = async()=>{
-    try{
+const dns = require('dns');
+
+// Set public DNS servers to resolve MongoDB Atlas SRV lookup issues
+try {
+    dns.setServers(['8.8.8.8', '8.8.4.4']);
+} catch (e) {
+    console.log("DNS setServers failed:", e);
+}
+
+const connectDb = async () => {
+    try {
         await mongoose.connect(process.env.db)
         console.log("DB Connected")
 
@@ -19,7 +28,7 @@ const connectDb = async()=>{
             await product.save();
         }
         console.log("Product ratings initialized/synchronized successfully!");
-    }catch(err){
+    } catch (err) {
         console.log("Error Connecting DB: ", err);
     }
 }
