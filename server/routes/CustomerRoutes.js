@@ -17,15 +17,15 @@ router.post("/product/all", productsController.all)
 router.post("/category/all", categoryController.all)
 router.post('/brand/all', BrandController.all)
 router.post("/product/single", productsController.single)
-
+router.post('/product/filtercategory', productController.FilterByCategoryId)
+router.post('/product/filterbrand', productController.FilterByBrandId)
 //Login
 router.post("/Register", CustomerController.Register)
 router.post("/login", userController.login)
 router.post('/review/all', reviewController.all)
 router.post('/category/single', categoryController.single)
 router.post('/review/single', reviewController.single)
-router.post('/product/filtercategory', productController.FilterByCategoryId)
-router.post('/product/filterbrand', productController.FilterByBrandId)
+
 
 router.use(require("../middleware/customerTokenChecker"))
 
