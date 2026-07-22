@@ -22,11 +22,14 @@ router.post("/product/single", productsController.single)
 router.post("/Register", CustomerController.Register)
 router.post("/login", userController.login)
 router.post('/review/all', reviewController.all)
-router.post('/review/single', reviewController.single)
-router.use(require("../middleware/customerTokenChecker"))
 router.post('/category/single', categoryController.single)
-router.post("/product/add", productsController.add)
+router.post('/review/single', reviewController.single)
+router.post('/product/filtercategory', productController.FilterByCategoryId)
+router.post('/product/filterbrand', productController.FilterByBrandId)
 
+router.use(require("../middleware/customerTokenChecker"))
+
+router.post("/product/add", productsController.add)
 router.post('/wishlist/add', wishlistController.createWishlist)
 router.post('/wishlist/all', wishlistController.getAll)
 router.post('/wishlist/addItems', wishlistController.addItem)
@@ -44,13 +47,10 @@ router.post('/cart/decrement', CartController.decrement)
 //Address
 router.post('/address/add', AddressController.add);
 router.post('/address/all', AddressController.all);
-
 router.post('/coupon/all', CouponController.all)
-router.post('/product/filtercategory', productController.FilterByCategoryId)
+
 
 //Brand
-router.post('/product/filterbrand', productController.FilterByBrandId)
-
 router.post('/review/add', reviewController.add)
 router.post('/review/update', reviewController.update)
 router.post('/review/DeleteOne', reviewController.DeleteOne)
