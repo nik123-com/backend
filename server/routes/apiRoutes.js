@@ -10,6 +10,7 @@ const userController = require('../apis/user/userController')
 const CouponController = require('../apis/coupons/CouponsController')
 const AddressController = require('../apis/address/AddressController')
 const CartController = require('../apis/cart/CartController')
+const queryController = require('../apis/query/QueryController')
 
 const aiController = require('../apis/aiControler/aiController')
 // const wishlistController = require('../apis/wishList/WishListController')
@@ -122,6 +123,10 @@ router.post('/order/update', OrderController.updateOrderStatus)
 //Address
 router.post('/address/add', AddressController.add);
 router.post('/address/all', AddressController.all);
+
+//Query
+router.post('/query/all', queryController.getAllQueries);
+router.post('/query/reply', upload.single('adminAttachment'), queryController.replyQuery);
 
 // WishList
 // router.post('/wishlist/add',wishlistController.createWishlist)

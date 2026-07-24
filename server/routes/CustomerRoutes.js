@@ -10,6 +10,9 @@ const BrandController = require('../apis/brand/BrandController')
 const reviewController = require('../apis/review/ReviewController')
 const OrderController = require('../apis/order/OrderController')
 const productController = require('../apis/product/ProductController')
+const queryController = require('../apis/query/QueryController')
+const multer = require('multer')
+const upload = multer({ storage: multer.memoryStorage() })
 const router = require("express").Router()
 
 
@@ -61,5 +64,10 @@ router.post('/order/add', OrderController.addOrder)
 router.post('/order/all', OrderController.getOrders)
 router.post('/order/single', OrderController.singleOrder)
 router.post('/order/update', OrderController.updateOrderStatus)
+
+//Query
+router.post('/query/add', upload.single('evidenceFile'), queryController.addQuery)
+router.post('/query/all', queryController.getCustomerQueries)
+router.post('/query/feedback', queryController.submitFeedback)
 
 module.exports = router;

@@ -151,7 +151,8 @@ const allOrders = async (req, res) => {
       .find({ isDeleted: false })
       .populate("customerId", "name email")
       .populate("couponId", "code discount")
-      .populate("addressId");
+      .populate("addressId")
+      .sort({ createdAt: -1 });
 
 
     let total = await orderModel.countDocuments({ isDeleted: false });
