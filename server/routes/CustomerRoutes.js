@@ -11,10 +11,10 @@ const reviewController = require('../apis/review/ReviewController')
 const OrderController = require('../apis/order/OrderController')
 const productController = require('../apis/product/ProductController')
 const queryController = require('../apis/query/QueryController')
+const notificationController = require('../apis/notification/NotificationController')
 const multer = require('multer')
 const upload = multer({ storage: multer.memoryStorage() })
 const router = require("express").Router()
-
 
 router.post("/product/all", productsController.all)
 router.post("/category/all", categoryController.all)
@@ -31,6 +31,11 @@ router.post('/review/single', reviewController.single)
 
 
 router.use(require("../middleware/customerTokenChecker"))
+
+// Notification Routes
+router.post('/notification/all', notificationController.getNotifications)
+router.post('/notification/respond', notificationController.respondInvite)
+router.post('/notification/markRead', notificationController.markAsRead)
 
 router.post("/product/add", productsController.add)
 router.post('/wishlist/add', wishlistController.createWishlist)

@@ -10,7 +10,8 @@ const wishlistSchema = mongoose.Schema({
     sharedWith: [
         {
             userId: { type: mongoose.Schema.Types.ObjectId, ref: 'user' }, // Friends with whom it's shared
-            sharedAt: { type: Date, default: Date.now }
+            sharedAt: { type: Date, default: Date.now },
+            status: { type: String, enum: ['pending', 'accepted', 'rejected'], default: 'accepted' }
         }
     ],
     createdAt: { type: Date, default: Date.now },

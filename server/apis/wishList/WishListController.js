@@ -95,6 +95,26 @@ function deleteWishListFun(req, next) {
                 });
             }
 
+            const wishlist = await WishList.findById(formData._id);
+            if (!wishlist) {
+                return reject({
+                    status: 404,
+                    success: false,
+                    message: "Wishlist not found"
+                });
+            }
+
+            const currentUserId = (req.decoded.addedById || req.decoded.userId).toString();
+            const ownerId = (wishlist.addedById?._id || wishlist.addedById).toString();
+
+            if (currentUserId !== ownerId) {
+                return reject({
+                    status: 403,
+                    success: false,
+                    message: "Only the author (owner) of this wishlist has authority to delete it"
+                });
+            }
+
             await WishList.deleteOne({ _id: formData._id });
 
             resolve({
@@ -136,48 +156,88 @@ function addFriendFun(req, next) {
                 return reject({
                     status: 400,
                     success: false,
-                    message: "friend email is Required"
+                    message: "Friend email is Required"
                 });
             }
 
             const groupData = await WishList.findOne({ _id: formData._id });
-            const user = await User.findOne({ email: "customer@gmail.com" });
-
-            console.log(user);
-            
-
-            if (!user || user.usertype != 2) {
+            if (!groupData) {
                 return reject({
                     status: 400,
                     success: false,
-                    message: "email/user is not exist"
+                    message: "Wishlist not found"
                 });
             }
 
-            if (groupData.addedById.toString() === user._id.toString()) {
+            const targetUser = await User.findOne({ email: formData.email.toLowerCase().trim() });
+
+            if (!targetUser || targetUser.usertype != "2") {
                 return reject({
                     status: 400,
                     success: false,
-                    message: "Owner cannot add themselves as a friend"
+                    message: "User with this email does not exist"
                 });
             }
 
-            const isAlreadyAdded = groupData.sharedWith.some(friend => friend.userId.toString() === user._id.toString());
-            if (isAlreadyAdded) {
+            const currentUserId = req.decoded.addedById || req.decoded.userId;
+
+            if (groupData.addedById.toString() === targetUser._id.toString()) {
                 return reject({
                     status: 400,
                     success: false,
-                    message: "User is already a friend of this wishlist"
+                    message: "Owner cannot invite themselves"
                 });
             }
 
-            groupData.sharedWith.push({ userId: user._id });
-            await groupData.save();
+            const existingMember = groupData.sharedWith.find(
+                friend => friend.userId && friend.userId.toString() === targetUser._id.toString()
+            );
+
+            if (existingMember && existingMember.status === 'accepted') {
+                return reject({
+                    status: 400,
+                    success: false,
+                    message: "User is already a member of this wishlist"
+                });
+            }
+
+            const Notification = require('../notification/NotificationModel');
+            const existingPending = await Notification.findOne({
+                senderId: currentUserId,
+                recipientId: targetUser._id,
+                wishlistId: groupData._id,
+                status: 'pending'
+            });
+
+            if (existingPending) {
+                return reject({
+                    status: 400,
+                    success: false,
+                    message: "Invitation is already sent and pending"
+                });
+            }
+
+            const senderUser = await User.findById(currentUserId);
+
+            const newNotification = new Notification({
+                senderId: currentUserId,
+                recipientId: targetUser._id,
+                wishlistId: groupData._id,
+                type: 'wishlist_invite',
+                status: 'pending',
+                message: `${senderUser?.name || senderUser?.email || 'A user'} invited you to join wishlist "${groupData.listName || 'Collection'}"`
+            });
+            await newNotification.save();
+
+            if (!existingMember) {
+                groupData.sharedWith.push({ userId: targetUser._id, status: 'pending' });
+                await groupData.save();
+            }
 
             resolve({
                 status: 200,
                 success: true,
-                message: "Friend Added Successfully"
+                message: `Invitation sent to ${targetUser.email}. Waiting for response.`
             });
 
         } catch (err) {
@@ -497,12 +557,18 @@ function getAllFun(req, next) {
                     .populate("messages.sender");
             } 
             else {
-                console.log("hloo");
-                
+                const currentUserId = new mongoose.Types.ObjectId(req.decoded.addedById || req.decoded.userId);
                 data = await WishList.find({
                     $or: [
-                        { addedById: new mongoose.Types.ObjectId(req.decoded.addedById) },
-                        { 'sharedWith.userId': new mongoose.Types.ObjectId(req.decoded.addedById) }
+                        { addedById: currentUserId },
+                        { 
+                            sharedWith: {
+                                $elemMatch: {
+                                    userId: currentUserId,
+                                    status: { $ne: 'pending' }
+                                }
+                            } 
+                        }
                     ]
                 })
                     .populate("items.productId")
@@ -565,6 +631,17 @@ function toggleWishlistAccessFun(req, next) {
                     status: 400,
                     success: false,
                     message: "WishList is not exist"
+                });
+            }
+
+            const currentUserId = (req.decoded.addedById || req.decoded.userId).toString();
+            const ownerId = (result.addedById?._id || result.addedById).toString();
+
+            if (currentUserId !== ownerId) {
+                return reject({
+                    status: 403,
+                    success: false,
+                    message: "Only the author (owner) of this wishlist can change privacy settings"
                 });
             }
 
