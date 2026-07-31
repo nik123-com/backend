@@ -172,11 +172,15 @@ const update = async (req, res) => {
             })
         } else {
 
+            const wasOff = ProductData.status === false;
             if (incomingData.name) {
                 ProductData.name = incomingData.name;
             }
             if (incomingData.description) {
                 ProductData.description = incomingData.description;
+            }
+            if (incomingData.status !== undefined) {
+                ProductData.status = incomingData.status === "true" || incomingData.status === true;
             }
             if (req.file) {
                 ProductData.image = req.file.filename;
@@ -187,8 +191,36 @@ const update = async (req, res) => {
             if (req.brand_id) {
                 ProductData.brand_id = req.brand_id;
             }
-            ProductData.updatedAt = Date.now()
-            let updatedProduct = await ProductData.save()
+            ProductData.updatedAt = Date.now();
+            const isNowOn = ProductData.status === true;
+
+            let updatedProduct = await ProductData.save();
+
+            if (wasOff && isNowOn) {
+                try {
+                    const StockNotification = require('../notification/StockNotificationModel');
+                    const Notification = require('../notification/NotificationModel');
+
+                    const pendingSubscribers = await StockNotification.find({
+                        productId: ProductData._id,
+                        status: 'pending'
+                    });
+
+                    for (let sub of pendingSubscribers) {
+                        await Notification.create({
+                            recipientId: sub.userId,
+                            productId: ProductData._id,
+                            type: 'stock_available',
+                            message: `Good news! Stock for "${ProductData.name}" is now available.`,
+                            status: 'pending'
+                        });
+                        sub.status = 'notified';
+                        await sub.save();
+                    }
+                } catch (notifErr) {
+                    console.error("Error triggering stock notifications:", notifErr);
+                }
+            }
 
             res.json({
                 status: 200,
@@ -255,51 +287,68 @@ const DeleteOne = (req, res) => {
             });
     }
 };
-const softDelete = (req, res) => {
-    if (!req.body._id) {
-        res.send({
-            status: 404,
-            message: "_id is required",
+const softDelete = async (req, res) => {
+    try {
+        if (!req.body._id) {
+            return res.send({
+                status: 404,
+                message: "_id is required",
+                success: false,
+            });
+        }
+        const ExistCate = await ProductModel.findOne({ _id: req.body._id });
+        if (ExistCate == null) {
+            return res.send({
+                status: 404,
+                message: "Not Found",
+                success: false,
+            });
+        }
+
+        const wasOff = ExistCate.status === false;
+        ExistCate.status = !ExistCate.status;
+        const isNowOn = ExistCate.status === true;
+
+        const data = await ExistCate.save();
+
+        if (wasOff && isNowOn) {
+            try {
+                const StockNotification = require('../notification/StockNotificationModel');
+                const Notification = require('../notification/NotificationModel');
+
+                const pendingSubscribers = await StockNotification.find({
+                    productId: ExistCate._id,
+                    status: 'pending'
+                });
+
+                for (let sub of pendingSubscribers) {
+                    await Notification.create({
+                        recipientId: sub.userId,
+                        productId: ExistCate._id,
+                        type: 'stock_available',
+                        message: `Good news! Stock for "${ExistCate.name}" is now available.`,
+                        status: 'pending'
+                    });
+                    sub.status = 'notified';
+                    await sub.save();
+                }
+            } catch (notifErr) {
+                console.error("Error triggering stock notifications:", notifErr);
+            }
+        }
+
+        return res.send({
+            status: 201,
+            message: "Status Updated Successfully",
+            success: true,
+            data: data,
+        });
+    } catch (err) {
+        return res.send({
+            status: 500,
+            message: "Internal Server Error: " + err.message,
             success: false,
         });
-    } else {
-        ProductModel
-            .findOne({_id: req.body._id })
-            .then((ExistCate) => {
-                if (ExistCate == null) {
-                    res.send({
-                        status: 404,
-                        message: "Not Found",
-                        success: false,
-                    });
-                } else {
-                    // console.log(ExistCate);
-                    ExistCate.status = !ExistCate.status;
-
-                    ExistCate.save()
-                        .then((data) => {
-                            res.send({
-                                status: 201,
-                                message: "Status Updated Successfully",
-                                data: data,
-                            });
-                        })
-                        .catch((err) => { 
-                         res.send({
-                            status: 400,
-                            success: false,
-                            message:err
-                         })
-                        });
-                }
-            })
-            .catch((err) => {
-                res.send({
-                    status: 500,
-                    message: "Internal Server Error",
-                    success: false,
-                });
-            });
     }
 };
 
@@ -376,6 +425,203 @@ const FilterByBrandId = async (req, res) => {
 };
 
 
+// VENDOR SPECIFIC PRODUCT METHODS
+const vendorAdd = async (req, res) => {
+    try {
+        const vendorId = req.vendor._id;
+        const {
+            name, description, price, category_id, brand_id,
+            stock, sku, warehouse, variants, isDraft,
+            seoTitle, seoKeywords, seoDescription, existingImages
+        } = req.body;
+
+        if (!name || !price || !category_id) {
+            return res.status(400).json({
+                success: false,
+                status: 400,
+                message: "Name, Price, and Category are required."
+            });
+        }
+
+        let imageArr = [];
+        if (existingImages) {
+            if (Array.isArray(existingImages)) imageArr = existingImages;
+            else try { imageArr = JSON.parse(existingImages); } catch (e) { imageArr = [existingImages]; }
+        }
+
+        if (req.files && req.files.length > 0) {
+            const uploadedUrls = await Promise.all(
+                req.files.map(async (f) => await uploadImg(f.buffer))
+            );
+            imageArr = [...imageArr, ...uploadedUrls];
+        }
+
+        let parsedVariants = [];
+        if (variants) {
+            if (Array.isArray(variants)) parsedVariants = variants;
+            else try { parsedVariants = JSON.parse(variants); } catch (e) { parsedVariants = []; }
+        }
+
+        const newProduct = new ProductModel({
+            name,
+            description: description || "",
+            price,
+            category_id,
+            brand_id: brand_id || null,
+            vendorId,
+            image: imageArr,
+            stock: Number(stock) || 0,
+            sku: sku || "",
+            warehouse: warehouse || "Main Warehouse",
+            variants: parsedVariants,
+            isDraft: isDraft === true || isDraft === "true",
+            seoTitle: seoTitle || "",
+            seoKeywords: seoKeywords || "",
+            seoDescription: seoDescription || "",
+            status: true
+        });
+
+        await newProduct.save();
+
+        return res.status(201).json({
+            success: true,
+            status: 201,
+            message: isDraft ? "Product saved as Draft" : "Product published successfully!",
+            data: newProduct
+        });
+    } catch (err) {
+        console.error("vendorAdd error:", err);
+        return res.status(500).json({
+            success: false,
+            status: 500,
+            message: err.message
+        });
+    }
+};
+
+const vendorAll = async (req, res) => {
+    try {
+        const vendorId = req.vendor._id;
+        const products = await ProductModel.find({ vendorId })
+            .populate("category_id")
+            .populate("brand_id")
+            .sort({ create_at: -1 });
+
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            data: products
+        });
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            status: 500,
+            message: err.message
+        });
+    }
+};
+
+const vendorUpdate = async (req, res) => {
+    try {
+        const vendorId = req.vendor._id;
+        const { _id, ...updates } = req.body;
+
+        if (!_id) {
+            return res.status(400).json({ success: false, status: 400, message: "Product _id is required" });
+        }
+
+        const product = await ProductModel.findOne({ _id, vendorId });
+        if (!product) {
+            return res.status(404).json({ success: false, status: 404, message: "Product not found or access denied" });
+        }
+
+        if (updates.variants && typeof updates.variants === 'string') {
+            try { updates.variants = JSON.parse(updates.variants); } catch (e) {}
+        }
+
+        let imageArr = product.image;
+        if (updates.existingImages) {
+            if (Array.isArray(updates.existingImages)) imageArr = updates.existingImages;
+            else try { imageArr = JSON.parse(updates.existingImages); } catch (e) { imageArr = [updates.existingImages]; }
+        }
+
+        if (req.files && req.files.length > 0) {
+            const uploadedUrls = await Promise.all(
+                req.files.map(async (f) => await uploadImg(f.buffer))
+            );
+            imageArr = [...imageArr, ...uploadedUrls];
+        }
+        updates.image = imageArr;
+
+        const updated = await ProductModel.findByIdAndUpdate(_id, { $set: updates }, { new: true });
+
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            message: "Product updated successfully!",
+            data: updated
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, status: 500, message: err.message });
+    }
+};
+
+const vendorDelete = async (req, res) => {
+    try {
+        const vendorId = req.vendor._id;
+        const { _id } = req.body;
+
+        if (!_id) {
+            return res.status(400).json({ success: false, status: 400, message: "_id is required" });
+        }
+
+        const product = await ProductModel.findOneAndDelete({ _id, vendorId });
+        if (!product) {
+            return res.status(404).json({ success: false, status: 404, message: "Product not found or access denied" });
+        }
+
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            message: "Product deleted successfully"
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, status: 500, message: err.message });
+    }
+};
+
+const vendorUpdateStock = async (req, res) => {
+    try {
+        const vendorId = req.vendor._id;
+        const { _id, stock, sku, warehouse } = req.body;
+
+        if (!_id) {
+            return res.status(400).json({ success: false, status: 400, message: "_id is required" });
+        }
+
+        const product = await ProductModel.findOne({ _id, vendorId });
+        if (!product) {
+            return res.status(404).json({ success: false, status: 404, message: "Product not found or access denied" });
+        }
+
+        if (stock !== undefined) product.stock = Number(stock);
+        if (sku) product.sku = sku;
+        if (warehouse) product.warehouse = warehouse;
+
+        await product.save();
+
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            message: "Inventory updated successfully",
+            data: product
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, status: 500, message: err.message });
+    }
+};
+
 module.exports = {
-    add, all, single, update, DeleteOne, softDelete, FilterByCategoryId, FilterByBrandId
+    add, all, single, update, DeleteOne, softDelete, FilterByCategoryId, FilterByBrandId,
+    vendorAdd, vendorAll, vendorUpdate, vendorDelete, vendorUpdateStock
 }

@@ -1,47 +1,51 @@
 const jwt = require("jsonwebtoken");
-const skey = "SecreteKey"
+const skey = "SecreteKey";
 const userModel = require("../apis/user/userModel");
 
-
 module.exports = (req, res, next) => {
-  // console.log(req.headers["authorization"]);
   let token = req.headers["authorization"];
+  if (!token) {
+    return res.status(401).json({
+      message: "Please login to continue.",
+      status: 401,
+      success: false
+    });
+  }
+
   jwt.verify(token, skey, function (err, decoded) {
-    if(err){
-        res.send({
-            message:"Token NOt Found",
-            status:404,
-            success:false,
-            err:err
-        })
-    }else{
-      console.log("decoded",decoded);
-      if(decoded.userType=="2"){
+    if (err) {
+      return res.status(401).json({
+        message: "Token expired or invalid. Please login again.",
+        status: 401,
+        success: false,
+        err: err
+      });
+    } else {
+      if (decoded.userType == "2") {
         userModel.findById(decoded.userId).then((user) => {
           if (!user || user.isBlocked === true) {
-            return res.send({
+            return res.status(403).json({
               message: "Your account has been blocked. Access denied.",
               status: 403,
               success: false
             });
           }
-          req.decoded=decoded
-          next()
+          req.decoded = decoded;
+          next();
         }).catch((dbErr) => {
-          res.send({
+          res.status(500).json({
             message: "Authentication error",
             status: 500,
             success: false,
             err: dbErr
           });
         });
-      }else{
-          res.send({
-            message:"Invaild Token",
-            status:404,
-            success:false,
-            
-        })
+      } else {
+        res.status(403).json({
+          message: "Invalid token or access denied.",
+          status: 403,
+          success: false
+        });
       }
     }
   });

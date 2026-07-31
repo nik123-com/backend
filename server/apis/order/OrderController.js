@@ -269,6 +269,159 @@ const singleOrder = async (req, res) => {
   }
 };
 
+// VENDOR SPECIFIC ORDER METHODS
+const vendorOrders = async (req, res) => {
+  try {
+    const vendorId = req.vendor._id;
+    const products = await productModel.find({ vendorId }).select('_id');
+    const productIds = products.map(p => p._id);
+
+    const orders = await orderModel.find({
+      "products.productId": { $in: productIds },
+      isDeleted: false
+    })
+      .populate("customerId", "name email Contact Address")
+      .populate("products.productId")
+      .populate("addressId")
+      .sort({ createdAt: -1 });
+
+    // Filter order products to only include products belonging to this vendor
+    const vendorSpecificOrders = orders.map(order => {
+      const orderObj = order.toObject();
+      orderObj.vendorItems = orderObj.products.filter(item => {
+        return item.productId && item.productId.vendorId && item.productId.vendorId.toString() === vendorId.toString();
+      });
+      orderObj.vendorSubtotal = orderObj.vendorItems.reduce((acc, item) => {
+        const itemPrice = Number(item.price || item.productId.price || 0);
+        return acc + (itemPrice * item.quantity);
+      }, 0);
+      return orderObj;
+    });
+
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      message: "Vendor orders fetched successfully",
+      data: vendorSpecificOrders
+    });
+  } catch (err) {
+    console.error("vendorOrders error:", err);
+    return res.status(500).json({
+      success: false,
+      status: 500,
+      message: err.message
+    });
+  }
+};
+
+const updateVendorOrderStatus = async (req, res) => {
+  try {
+    const vendorId = req.vendor._id;
+    const { orderId, status } = req.body; // status: 'accepted' | 'packed' | 'shipped' | 'delivered'
+
+    if (!orderId || !status) {
+      return res.status(400).json({
+        success: false,
+        status: 400,
+        message: "orderId and status are required"
+      });
+    }
+
+    const order = await orderModel.findById(orderId).populate("products.productId");
+    if (!order) {
+      return res.status(404).json({ success: false, status: 404, message: "Order not found" });
+    }
+
+    let itemUpdated = false;
+    order.products.forEach(item => {
+      if (item.productId && item.productId.vendorId && item.productId.vendorId.toString() === vendorId.toString()) {
+        item.itemStatus = status;
+        itemUpdated = true;
+      }
+    });
+
+    if (!itemUpdated) {
+      return res.status(403).json({ success: false, status: 403, message: "No items found for this vendor in order" });
+    }
+
+    order.updatedAt = Date.now();
+    await order.save();
+
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      message: `Order status updated to ${status}`,
+      data: order
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, status: 500, message: err.message });
+  }
+};
+
+const vendorInvoice = async (req, res) => {
+  try {
+    const vendorId = req.vendor._id;
+    const { orderId } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({ success: false, status: 400, message: "orderId is required" });
+    }
+
+    const order = await orderModel.findById(orderId)
+      .populate("customerId")
+      .populate("products.productId")
+      .populate("addressId");
+
+    if (!order) {
+      return res.status(404).json({ success: false, status: 404, message: "Order not found" });
+    }
+
+    const vendor = req.vendor;
+    const vendorItems = order.products.filter(item => 
+      item.productId && item.productId.vendorId && item.productId.vendorId.toString() === vendorId.toString()
+    );
+
+    const subtotal = vendorItems.reduce((acc, item) => acc + (Number(item.price || item.productId.price || 0) * item.quantity), 0);
+
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      data: {
+        invoiceNo: `INV-V${vendor._id.toString().slice(-4)}-${order.autoId}`,
+        date: order.createdAt,
+        vendor: {
+          businessName: vendor.businessName,
+          gstNumber: vendor.gstNumber,
+          panNumber: vendor.panNumber,
+          address: vendor.address,
+          email: vendor.email,
+          phone: vendor.phone,
+          logo: vendor.logo
+        },
+        customer: {
+          name: order.customerId?.name || "Customer",
+          email: order.customerId?.email || "",
+          contact: order.customerId?.Contact || "",
+          address: order.addressId
+        },
+        items: vendorItems.map(item => ({
+          name: item.productId.name,
+          sku: item.productId.sku || "N/A",
+          quantity: item.quantity,
+          price: Number(item.price || item.productId.price || 0),
+          subtotal: Number(item.price || item.productId.price || 0) * item.quantity
+        })),
+        subtotal,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, status: 500, message: err.message });
+  }
+};
+
 module.exports = {
-  addOrder, getOrders, countOrders, allOrders, updateOrderStatus, singleOrder
-}
+  addOrder, getOrders, countOrders, allOrders, updateOrderStatus, singleOrder,
+  vendorOrders, updateVendorOrderStatus, vendorInvoice
+}

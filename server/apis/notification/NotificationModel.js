@@ -1,13 +1,14 @@
 const mongoose = require('mongoose');
 
 const notificationSchema = new mongoose.Schema({
-    senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'user', required: true },
+    senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'user' },
     recipientId: { type: mongoose.Schema.Types.ObjectId, ref: 'user', required: true },
     wishlistId: { type: mongoose.Schema.Types.ObjectId, ref: 'wishlist' },
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
     type: { 
         type: String, 
-        enum: ['wishlist_invite', 'invite_accepted', 'invite_rejected', 'general'], 
-        default: 'wishlist_invite' 
+        enum: ['wishlist_invite', 'invite_accepted', 'invite_rejected', 'stock_available', 'general'], 
+        default: 'general' 
     },
     status: { 
         type: String, 

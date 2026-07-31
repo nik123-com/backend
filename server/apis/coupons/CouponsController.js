@@ -205,6 +205,84 @@ const softDelete = async (req, res) => {
         });
     }
 };
+// VENDOR SPECIFIC COUPONS
+const vendorAdd = async (req, res) => {
+    try {
+        const vendorId = req.vendor._id;
+        const { code, discount, discountType, minAmoutSpend, expiryDate } = req.body;
+
+        if (!code || !discount) {
+            return res.status(400).json({ success: false, status: 400, message: "Code and discount are required" });
+        }
+
+        const existing = await CouponModel.findOne({ code: code.toUpperCase() });
+        if (existing) {
+            return res.status(400).json({ success: false, status: 400, message: "Coupon code already exists" });
+        }
+
+        const newCoupon = new CouponModel({
+            code: code.toUpperCase(),
+            discount,
+            discountType: discountType || "Percentage",
+            minAmoutSpend: Number(minAmoutSpend) || 0,
+            expiryDate: expiryDate || "",
+            vendorId: vendorId,
+            status: true
+        });
+
+        await newCoupon.save();
+
+        return res.status(201).json({
+            success: true,
+            status: 201,
+            message: "Vendor coupon created successfully!",
+            data: newCoupon
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, status: 500, message: err.message });
+    }
+};
+
+const vendorAll = async (req, res) => {
+    try {
+        const vendorId = req.vendor._id;
+        const coupons = await CouponModel.find({ vendorId }).sort({ _id: -1 });
+
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            data: coupons
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, status: 500, message: err.message });
+    }
+};
+
+const vendorDelete = async (req, res) => {
+    try {
+        const vendorId = req.vendor._id;
+        const { _id } = req.body;
+
+        if (!_id) {
+            return res.status(400).json({ success: false, status: 400, message: "_id is required" });
+        }
+
+        const coupon = await CouponModel.findOneAndDelete({ _id, vendorId });
+        if (!coupon) {
+            return res.status(404).json({ success: false, status: 404, message: "Coupon not found or access denied" });
+        }
+
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            message: "Coupon deleted successfully"
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, status: 500, message: err.message });
+    }
+};
+
 module.exports = {
-    add,all,update,single,DeleteOne,softDelete
-}
+    add, all, update, single, DeleteOne, softDelete,
+    vendorAdd, vendorAll, vendorDelete
+}

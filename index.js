@@ -36,8 +36,8 @@ app.use('/api', apiRoutes);
 const CustomerRoutes = require('./server/routes/CustomerRoutes')
 app.use("/customer", CustomerRoutes)
 
-// const VendorRoutes = require('./server/routes/VendorRoutes')
-// app.use("/vendor", VendorRoutes)
+const VendorRoutes = require('./server/routes/VendorRoutes')
+app.use("/vendor", VendorRoutes)
 
 
 // for app listening

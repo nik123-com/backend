@@ -282,6 +282,62 @@ const softDelete = (req, res) => {
 };
 
 
+// VENDOR REVIEWS
+const vendorReviews = async (req, res) => {
+    try {
+        const vendorId = req.vendor._id;
+        const products = await ProductModel.find({ vendorId }).select('_id');
+        const productIds = products.map(p => p._id);
+
+        const reviews = await reviewModel.find({ productId: { $in: productIds } })
+            .populate("userId", "name email")
+            .populate("productId", "name image price")
+            .sort({ createdAt: -1 });
+
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            data: reviews
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, status: 500, message: err.message });
+    }
+};
+
+const vendorReplyReview = async (req, res) => {
+    try {
+        const vendorId = req.vendor._id;
+        const { reviewId, reply } = req.body;
+
+        if (!reviewId || !reply) {
+            return res.status(400).json({ success: false, status: 400, message: "reviewId and reply text are required" });
+        }
+
+        const review = await reviewModel.findById(reviewId).populate("productId");
+        if (!review) {
+            return res.status(404).json({ success: false, status: 404, message: "Review not found" });
+        }
+
+        if (!review.productId || !review.productId.vendorId || review.productId.vendorId.toString() !== vendorId.toString()) {
+            return res.status(403).json({ success: false, status: 403, message: "Access denied. Product belongs to another vendor." });
+        }
+
+        review.reply = reply;
+        review.repliedAt = new Date();
+        await review.save();
+
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            message: "Reply added successfully!",
+            data: review
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, status: 500, message: err.message });
+    }
+};
+
 module.exports = {
-    add, all, single, update,DeleteOne,softDelete
-}
+    add, all, single, update, DeleteOne, softDelete,
+    vendorReviews, vendorReplyReview
+}

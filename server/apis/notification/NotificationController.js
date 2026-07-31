@@ -1,16 +1,20 @@
 const Notification = require('./NotificationModel');
 const WishList = require('../wishList/WishListModel');
 const User = require('../user/userModel');
+const StockNotification = require('./StockNotificationModel');
 
 module.exports = {
     getNotifications,
     respondInvite,
-    markAsRead
+    markAsRead,
+    requestStockNotification,
+    getUserStockNotifications,
+    deleteNotification
 };
 
 async function getNotifications(req, res) {
     try {
-        const userId = req.decoded.userId || req.decoded.addedById;
+        const userId = req.decoded?.userId || req.decoded?.addedById || req.decoded?._id || req.decoded?.id;
         const notifications = await Notification.find({ recipientId: userId })
             .sort({ createdAt: -1 })
             .populate('senderId', 'name email')
@@ -135,7 +139,7 @@ async function respondInvite(req, res) {
 
 async function markAsRead(req, res) {
     try {
-        const userId = req.decoded.userId || req.decoded.addedById;
+        const userId = req.decoded?.userId || req.decoded?.addedById || req.decoded?._id || req.decoded?.id;
         await Notification.updateMany(
             { recipientId: userId, status: 'pending', type: { $ne: 'wishlist_invite' } },
             { $set: { status: 'read' } }
@@ -150,6 +154,117 @@ async function markAsRead(req, res) {
             success: false,
             status: 500,
             message: err.message || "Failed to mark notifications as read"
+        });
+    }
+}
+
+async function deleteNotification(req, res) {
+    try {
+        const userId = req.decoded?.userId || req.decoded?.addedById || req.decoded?._id || req.decoded?.id;
+        const { notificationId } = req.body;
+
+        if (notificationId) {
+            await Notification.deleteOne({ _id: notificationId, recipientId: userId });
+        } else {
+            await Notification.deleteMany({ recipientId: userId });
+        }
+
+        res.status(200).json({
+            success: true,
+            status: 200,
+            message: "Notification cleared successfully"
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            status: 500,
+            message: err.message || "Failed to clear notification"
+        });
+    }
+}
+
+async function requestStockNotification(req, res) {
+    try {
+        const userId = req.decoded?.userId || req.decoded?.addedById || req.decoded?._id || req.decoded?.id;
+        const { productId } = req.body;
+
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                status: 401,
+                message: "User session expired or invalid. Please log in again."
+            });
+        }
+
+        if (!productId) {
+            return res.status(400).json({
+                success: false,
+                status: 400,
+                message: "productId is required"
+            });
+        }
+
+        const existing = await StockNotification.findOne({
+            userId,
+            productId,
+            status: 'pending'
+        });
+
+        if (existing) {
+            return res.status(200).json({
+                success: true,
+                status: 200,
+                message: "You will be notified when this product is back in stock!",
+                isSubscribed: true
+            });
+        }
+
+        await StockNotification.create({
+            userId,
+            productId,
+            status: 'pending'
+        });
+
+        res.status(200).json({
+            success: true,
+            status: 200,
+            message: "We'll notify you when stock becomes available!",
+            isSubscribed: true
+        });
+    } catch (err) {
+        console.error("requestStockNotification error:", err);
+        res.status(500).json({
+            success: false,
+            status: 500,
+            message: err.message || "Failed to subscribe for stock notification"
+        });
+    }
+}
+
+async function getUserStockNotifications(req, res) {
+    try {
+        const userId = req.decoded?.userId || req.decoded?.addedById || req.decoded?._id || req.decoded?.id;
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                status: 401,
+                message: "User session expired or invalid."
+            });
+        }
+        const list = await StockNotification.find({ userId, status: 'pending' });
+        const productIds = list.map(item => item.productId ? item.productId.toString() : "");
+
+        res.status(200).json({
+            success: true,
+            status: 200,
+            data: productIds
+        });
+    } catch (err) {
+        console.error("getUserStockNotifications error:", err);
+        res.status(500).json({
+            success: false,
+            status: 500,
+            message: err.message || "Failed to fetch stock subscriptions"
         });
     }
 }

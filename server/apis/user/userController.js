@@ -79,7 +79,7 @@ const changepassword = async (req, res) => {
   const userSchema = Joi.object({
     email: Joi.string().email().required(),
     oldPassword: Joi.string().required(),
-    newPassword: Joi.string().min(6).max(30).required(),
+    newPassword: Joi.string().max(30).required(),
     confirmPassword: Joi.string().required(),
   });
 
@@ -213,8 +213,8 @@ const resetPassword = async (req, res) => {
       return res.send({ success: false, status: 400, message: "Password reset token is invalid or has expired." });
     }
 
-    if (!newPassword || newPassword.length < 6) {
-        return res.send({ success: false, status: 400, message: "Password must be at least 6 characters long." });
+    if (!newPassword) {
+        return res.send({ success: false, status: 400, message: "Password is required." });
     }
 
     user.password = await bcrypt.hash(newPassword, 10);

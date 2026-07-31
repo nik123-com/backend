@@ -135,11 +135,12 @@ router.post('/query/reply', upload.single('adminAttachment'), queryController.re
 // router.post('/wishlist/update',wishlistController.update)
 // router.post('/wishlist/delete',wishlistController.DeleteOne)
 
-// //Vendor
-// router.post('/vendor/all',vendorController.all)
-// router.post('/vendor/single',vendorController.single)
-// router.post('/vendor/update',vendorController.update)
-// router.post('/vendor/DeleteOne',vendorController.DeleteOne)
-// router.post('/vendor/softDelete',vendorController.softDelete)
+const VendorController = require('../apis/vendor/VendorController')
+
+// Admin Vendor Management
+router.post('/vendor/all', VendorController.getAllVendors)
+router.post('/vendor/approve', VendorController.approveVendor)
+router.post('/vendor/reject', VendorController.rejectVendor)
+router.post('/vendor/toggleBlock', VendorController.toggleBlockVendor)
 
 module.exports = router; 
