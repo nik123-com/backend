@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const replySchema = new mongoose.Schema({
-  sender: { type: String, enum: ["Customer", "Admin"], required: true },
+  sender: { type: String, enum: ["Customer", "Admin", "Vendor"], required: true },
   senderName: { type: String, default: "" },
   message: { type: String, required: true },
   meetLink: { type: String, default: "" },

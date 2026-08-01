@@ -69,7 +69,7 @@ const addQuery = async (req, res) => {
       evidenceFile: evidenceFileUrl,
       replies: [
         {
-          sender: resolvedUserType,
+          sender: "Customer",
           senderName: senderName,
           message: description,
           attachment: evidenceFileUrl,
@@ -101,16 +101,23 @@ const addQuery = async (req, res) => {
 const getCustomerQueries = async (req, res) => {
   try {
     const rawUserId = req.body.userId || (req.decoded ? req.decoded.userId : null);
+    const email = req.body.email;
     let filter = {};
 
+    const orConditions = [];
     if (rawUserId && mongoose.Types.ObjectId.isValid(rawUserId)) {
       const customer = await customerModel.findOne({ userId: rawUserId });
       const vendor = req.vendor || (await vendorModel.findOne({ userId: rawUserId }));
       
-      const orConditions = [{ userId: rawUserId }];
+      orConditions.push({ userId: rawUserId });
       if (customer) orConditions.push({ customerId: customer._id });
       if (vendor) orConditions.push({ vendorId: vendor._id });
+    }
+    if (email) {
+      orConditions.push({ email: email });
+    }
 
+    if (orConditions.length > 0) {
       filter = { $or: orConditions };
     }
 
