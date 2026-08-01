@@ -29,6 +29,10 @@ router.post('/review/all', reviewController.all)
 router.post('/category/single', categoryController.single)
 router.post('/review/single', reviewController.single)
 
+// Query Routes (Accessible to logged-in Customers & Vendors)
+router.post('/query/add', upload.single('evidenceFile'), queryController.addQuery)
+router.post('/query/all', queryController.getCustomerQueries)
+router.post('/query/feedback', queryController.submitFeedback)
 
 router.use(require("../middleware/customerTokenChecker"))
 
@@ -72,10 +76,5 @@ router.post('/order/add', OrderController.addOrder)
 router.post('/order/all', OrderController.getOrders)
 router.post('/order/single', OrderController.singleOrder)
 router.post('/order/update', OrderController.updateOrderStatus)
-
-//Query
-router.post('/query/add', upload.single('evidenceFile'), queryController.addQuery)
-router.post('/query/all', queryController.getCustomerQueries)
-router.post('/query/feedback', queryController.submitFeedback)
 
 module.exports = router;

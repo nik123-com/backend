@@ -1,5 +1,5 @@
 const { GoogleGenAI } = require("@google/genai");
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY ;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
@@ -12,7 +12,7 @@ const main = async (req, res) => {
     });
   } else {
     try {
-         let prompt=req.body.prompt +" according to Ecommerce Website Guide"
+      let prompt = req.body.prompt + " according to Ecommerce Website Guide"
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",

@@ -8,6 +8,7 @@ const productController = require('../apis/product/ProductController');
 const OrderController = require('../apis/order/OrderController');
 const CouponController = require('../apis/coupons/CouponsController');
 const reviewController = require('../apis/review/ReviewController');
+const queryController = require('../apis/query/QueryController');
 const aiController = require('../apis/aiControler/aiController');
 
 const vendorTokenChecker = require('../middleware/vendorTokenChecker');
@@ -49,6 +50,11 @@ router.post('/coupon/delete', CouponController.vendorDelete);
 // Reviews
 router.post('/review/all', reviewController.vendorReviews);
 router.post('/review/reply', reviewController.vendorReplyReview);
+
+// Support Queries
+router.post('/query/add', upload.single('evidenceFile'), queryController.addQuery);
+router.post('/query/all', queryController.getCustomerQueries);
+router.post('/query/feedback', queryController.submitFeedback);
 
 // AI Assistant
 router.post('/ai/description', aiController.generateProductDescription);

@@ -1,11 +1,13 @@
+const mongoose = require("mongoose");
 const queryModel = require("./QueryModel");
 const customerModel = require("../customer/CustomerModel");
+const vendorModel = require("../vendor/VendorModel");
 const { uploadImg } = require("../../../utilities/helper");
 
-// Add customer query to MongoDB
+// Add query (Customer or Vendor) to MongoDB
 const addQuery = async (req, res) => {
   try {
-    const { userId, subject, description, name, email } = req.body;
+    const { userId, subject, description, name, email, userType } = req.body;
 
     if (!subject || !description) {
       return res.json({
@@ -16,34 +18,59 @@ const addQuery = async (req, res) => {
     }
 
     let customer = null;
-    if (userId) {
-      customer = await customerModel.findOne({ userId: userId });
+    let vendor = req.vendor || null;
+    let resolvedUserType = userType || (vendor ? "Vendor" : "Customer");
+
+    const validUserId = (userId && mongoose.Types.ObjectId.isValid(userId)) 
+      ? userId 
+      : (req.decoded && mongoose.Types.ObjectId.isValid(req.decoded.userId) ? req.decoded.userId : null);
+
+    if (validUserId) {
+      if (!vendor) {
+        vendor = await vendorModel.findOne({ userId: validUserId });
+      }
+      if (vendor) {
+        resolvedUserType = "Vendor";
+      } else {
+        customer = await customerModel.findOne({ userId: validUserId });
+      }
     }
 
-    const totalCount = await queryModel.countDocuments();
-    const queryId = `QRY-${1000 + totalCount + 1}`;
+    let totalCount = await queryModel.countDocuments();
+    let nextNum = 1000 + totalCount + 1;
+    let queryId = `QRY-${nextNum}`;
+    while (await queryModel.exists({ queryId })) {
+      nextNum++;
+      queryId = `QRY-${nextNum}`;
+    }
 
     let evidenceFileUrl = "";
     if (req.file) {
-      evidenceFileUrl = await uploadImg(req.file.buffer);
+      try {
+        evidenceFileUrl = await uploadImg(req.file.buffer);
+      } catch (fileErr) {
+        console.error("Cloudinary upload error during query submission:", fileErr);
+      }
     }
 
-    const customerName = name || (customer ? customer.name : "Customer");
-    const customerEmail = email || (customer ? customer.email : "");
+    const senderName = name || (resolvedUserType === "Vendor" ? (vendor ? vendor.businessName : "Vendor") : (customer ? customer.name : "Customer"));
+    const senderEmail = email || (resolvedUserType === "Vendor" ? (vendor ? vendor.email : "") : (customer ? customer.email : ""));
 
     const newQuery = new queryModel({
       queryId,
-      userId: userId || null,
+      userId: validUserId || null,
       customerId: customer ? customer._id : null,
-      name: customerName,
-      email: customerEmail,
+      vendorId: vendor ? vendor._id : null,
+      userType: resolvedUserType,
+      name: senderName,
+      email: senderEmail,
       subject,
       description,
       evidenceFile: evidenceFileUrl,
       replies: [
         {
-          sender: "Customer",
-          senderName: customerName,
+          sender: resolvedUserType,
+          senderName: senderName,
           message: description,
           attachment: evidenceFileUrl,
           createdAt: Date.now(),
@@ -62,7 +89,7 @@ const addQuery = async (req, res) => {
     });
   } catch (err) {
     console.error("Error adding query:", err);
-    return res.json({
+    return res.status(500).json({
       status: 500,
       success: false,
       message: "Internal Server Error: " + err.message,
@@ -70,19 +97,21 @@ const addQuery = async (req, res) => {
   }
 };
 
-// Get queries for logged in customer from MongoDB (Latest first)
+// Get queries for logged in user (Customer or Vendor) from MongoDB (Latest first)
 const getCustomerQueries = async (req, res) => {
   try {
-    const { userId } = req.body;
+    const rawUserId = req.body.userId || (req.decoded ? req.decoded.userId : null);
     let filter = {};
 
-    if (userId) {
-      const customer = await customerModel.findOne({ userId: userId });
-      if (customer) {
-        filter = { $or: [{ userId: userId }, { customerId: customer._id }] };
-      } else {
-        filter = { userId: userId };
-      }
+    if (rawUserId && mongoose.Types.ObjectId.isValid(rawUserId)) {
+      const customer = await customerModel.findOne({ userId: rawUserId });
+      const vendor = req.vendor || (await vendorModel.findOne({ userId: rawUserId }));
+      
+      const orConditions = [{ userId: rawUserId }];
+      if (customer) orConditions.push({ customerId: customer._id });
+      if (vendor) orConditions.push({ vendorId: vendor._id });
+
+      filter = { $or: orConditions };
     }
 
     const queries = await queryModel.find(filter).sort({ createdAt: -1 });
@@ -94,8 +123,8 @@ const getCustomerQueries = async (req, res) => {
       data: queries,
     });
   } catch (err) {
-    console.error("Error loading customer queries:", err);
-    return res.json({
+    console.error("Error loading queries:", err);
+    return res.status(500).json({
       status: 500,
       success: false,
       message: "Internal Server Error: " + err.message,

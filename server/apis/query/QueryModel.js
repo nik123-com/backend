@@ -13,6 +13,8 @@ const querySchema = new mongoose.Schema({
   queryId: { type: String, required: true, unique: true },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "user" },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: "customer" },
+  vendorId: { type: mongoose.Schema.Types.ObjectId, ref: "vendor" },
+  userType: { type: String, enum: ["Customer", "Vendor"], default: "Customer" },
   name: { type: String, default: "" },
   email: { type: String, default: "" },
   subject: { type: String, required: true },

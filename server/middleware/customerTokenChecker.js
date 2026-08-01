@@ -21,7 +21,7 @@ module.exports = (req, res, next) => {
         err: err
       });
     } else {
-      if (decoded.userType == "2") {
+      if (decoded.userType == "2" || decoded.userType == "3") {
         userModel.findById(decoded.userId).then((user) => {
           if (!user || user.isBlocked === true) {
             return res.status(403).json({
