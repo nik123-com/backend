@@ -42,7 +42,7 @@ const generateProductDescription = async (req, res) => {
       return res.status(400).json({ success: false, status: 400, message: "Product name is required" });
     }
 
-    const prompt = `Write an engaging, professional, e-commerce product description for a product named "${name}" in category "${category || 'General'}". Key features: ${features || 'Premium quality, durable, stylish'}. Keep it concise, engaging, and bulleted where appropriate. No markdown headers.`;
+    const prompt = `Write an engaging, professional e-commerce product description for a product named "${name}" in category "${category || 'General'}". Key features: ${features || 'Premium quality, durable, stylish'}. Keep it under 20 words strictly. Do not use markdown headers or formatting.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
