@@ -23,6 +23,21 @@ const addOrder = async (req, res) => {
       return res.send({ status: 404, success: false, message: "Your cart is empty" })
     }
 
+    // Check product stock before placing order
+    for (let item of cartItems) {
+      let product = await productModel.findOne({ _id: item.product_id })
+      if (!product) {
+        return res.send({ status: 404, success: false, message: "One or more products in your cart no longer exist" })
+      }
+      if (product.stock < item.qty) {
+        return res.send({
+          status: 400,
+          success: false,
+          message: `Insufficient stock for product: "${product.name}". Available stock: ${product.stock}`
+        })
+      }
+    }
+
     let totalOrders = await orderModel.countDocuments()
     let products = cartItems.map(item => ({
       productId: item.product_id,
@@ -52,6 +67,13 @@ const addOrder = async (req, res) => {
     newOrder.orderStatus = "Placed"
 
     const savedOrder = await newOrder.save()
+
+    // Subtract stock for ordered products
+    for (let item of cartItems) {
+      await productModel.findByIdAndUpdate(item.product_id, {
+        $inc: { stock: -item.qty }
+      })
+    }
 
     await cartModel.deleteMany({ user_id: req.body.userId })
 
@@ -203,6 +225,28 @@ const updateOrderStatus = async (req, res) => {
       });
     }
 
+    const newStatusLower = (req.body.orderStatus || "").toLowerCase();
+    const oldStatusLower = (order.orderStatus || "").toLowerCase();
+
+    // Restore stock if cancelled
+    if (newStatusLower === "cancelled" && oldStatusLower !== "cancelled") {
+      for (let item of order.products) {
+        if (item.productId) {
+          await productModel.findByIdAndUpdate(item.productId, {
+            $inc: { stock: item.quantity }
+          });
+        }
+      }
+    } else if (oldStatusLower === "cancelled" && newStatusLower !== "cancelled") {
+      for (let item of order.products) {
+        if (item.productId) {
+          await productModel.findByIdAndUpdate(item.productId, {
+            $inc: { stock: -item.quantity }
+          });
+        }
+      }
+    }
+
     order.orderStatus = req.body.orderStatus;
     if (req.body.paymentStatus) {
       order.paymentStatus = req.body.paymentStatus;
@@ -333,12 +377,21 @@ const updateVendorOrderStatus = async (req, res) => {
     }
 
     let itemUpdated = false;
-    order.products.forEach(item => {
+    for (let item of order.products) {
       if (item.productId && item.productId.vendorId && item.productId.vendorId.toString() === vendorId.toString()) {
+        const newStatusLower = (status || "").toLowerCase();
+        const oldStatusLower = (item.itemStatus || "").toLowerCase();
+        if (newStatusLower === "cancelled" && oldStatusLower !== "cancelled") {
+          const prodId = item.productId._id || item.productId;
+          await productModel.findByIdAndUpdate(prodId, { $inc: { stock: item.quantity } });
+        } else if (oldStatusLower === "cancelled" && newStatusLower !== "cancelled") {
+          const prodId = item.productId._id || item.productId;
+          await productModel.findByIdAndUpdate(prodId, { $inc: { stock: -item.quantity } });
+        }
         item.itemStatus = status;
         itemUpdated = true;
       }
-    });
+    }
 
     if (!itemUpdated) {
       return res.status(403).json({ success: false, status: 403, message: "No items found for this vendor in order" });

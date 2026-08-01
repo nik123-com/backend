@@ -1,4 +1,5 @@
 const cartModel = require('./CartModel');
+const productModel = require('../product/ProductModel');
 
 // CREATE OPERATION
 const add = async (req, res) => {
@@ -27,21 +28,35 @@ const add = async (req, res) => {
             });
         }
 
+        const product = await productModel.findById(incomingData.product_id);
+        if (!product) {
+            return res.json({
+                status: 404,
+                success: false,
+                message: "Product not found"
+            });
+        }
+
         const existingData = await cartModel.findOne({
             product_id: incomingData.product_id,
             user_id: incomingData.user_id,
         });
 
+        const currentQty = existingData ? existingData.qty : 0;
+        const addQty = Number(incomingData.qty) || 1;
+
+        if (product.stock < currentQty + addQty) {
+            return res.json({
+                status: 400,
+                success: false,
+                message: product.stock <= 0 ? "Product is out of stock" : `Only ${product.stock} units available in stock.`
+            });
+        }
+
         if (existingData) {
-        
-
-            existingData.qty= existingData.qty + 1,
-
-          
+            existingData.qty = existingData.qty + 1;
             await existingData.save();
         } else {
-
-
             const savedData = new cartModel({
                 product_id: incomingData.product_id,
                 user_id: incomingData.user_id,
@@ -50,7 +65,6 @@ const add = async (req, res) => {
             });
 
             await savedData.save();
-
         }
 
 
@@ -306,6 +320,15 @@ const increment = async (req, res) => {
                 status: 404,
                 success: false,
                 message: "Cart not found"
+            });
+        }
+
+        const product = await productModel.findById(existingData.product_id);
+        if (product && product.stock < existingData.qty + 1) {
+            return res.json({
+                status: 400,
+                success: false,
+                message: `Cannot increment. Only ${product.stock} units available in stock.`
             });
         }
 
