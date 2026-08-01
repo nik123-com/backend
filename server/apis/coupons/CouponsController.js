@@ -246,7 +246,13 @@ const vendorAdd = async (req, res) => {
 const vendorAll = async (req, res) => {
     try {
         const vendorId = req.vendor._id;
-        const coupons = await CouponModel.find({ vendorId }).sort({ _id: -1 });
+        const coupons = await CouponModel.find({
+            $or: [
+                { vendorId: vendorId },
+                { vendorId: null },
+                { vendorId: { $exists: false } }
+            ]
+        }).sort({ _id: -1 });
 
         return res.status(200).json({
             success: true,
