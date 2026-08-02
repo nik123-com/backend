@@ -126,7 +126,8 @@ const getOrders = async (req, res) => {
     let order = await orderModel.find({ customerId, isDeleted: false })
       .populate("products.productId")
       .populate("addressId")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
     let total = await orderModel.countDocuments({ isDeleted: false })
     res.send({
       success: true,
@@ -176,7 +177,8 @@ const allOrders = async (req, res) => {
       })
       .populate("couponId", "code discount")
       .populate("addressId")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     let total = await orderModel.countDocuments({ isDeleted: false });
 
@@ -290,7 +292,8 @@ const singleOrder = async (req, res) => {
         populate: { path: "vendorId", select: "businessName ownerName email phone" }
       })
       .populate("addressId")
-      .populate("couponId");
+      .populate("couponId")
+      .lean();
 
     if (!order) {
       return res.send({
@@ -331,11 +334,12 @@ const vendorOrders = async (req, res) => {
       .populate("customerId", "name email Contact Address")
       .populate("products.productId")
       .populate("addressId")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     // Filter order products to only include products belonging to this vendor
     const vendorSpecificOrders = orders.map(order => {
-      const orderObj = order.toObject();
+      const orderObj = order;
       orderObj.vendorItems = orderObj.products.filter(item => {
         return item.productId && item.productId.vendorId && item.productId.vendorId.toString() === vendorId.toString();
       });
