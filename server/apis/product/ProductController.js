@@ -535,6 +535,10 @@ const vendorUpdate = async (req, res) => {
             return res.status(404).json({ success: false, status: 404, message: "Product not found or access denied" });
         }
 
+        if (updates.isDraft !== undefined) {
+            updates.isDraft = updates.isDraft === true || updates.isDraft === "true";
+        }
+
         if (updates.variants && typeof updates.variants === 'string') {
             try { updates.variants = JSON.parse(updates.variants); } catch (e) {}
         }
