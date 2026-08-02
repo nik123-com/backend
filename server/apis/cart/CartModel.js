@@ -10,4 +10,6 @@ const cartSchema = new mongoose.Schema({
     status:{type:Boolean,default:true}
 })
 
+cartSchema.index({ user_id: 1 });
+
 module.exports = mongoose.model('cart', cartSchema)
