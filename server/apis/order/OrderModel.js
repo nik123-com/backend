@@ -27,4 +27,9 @@ const orderSchema = new mongoose.Schema({
     addedById: { type: mongoose.Schema.Types.ObjectId, ref: "user", default: null },
     updatedById: { type: mongoose.Schema.Types.ObjectId, ref: "user", default: null }
 })
+
+orderSchema.index({ customerId: 1, isDeleted: 1 });
+orderSchema.index({ "products.productId": 1, isDeleted: 1 });
+orderSchema.index({ isDeleted: 1, createdAt: -1 });
+
 module.exports = new mongoose.model("order", orderSchema)

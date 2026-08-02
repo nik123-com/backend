@@ -167,15 +167,16 @@ const countOrders = async (req, res) => {
 };
 const allOrders = async (req, res) => {
   try {
-
-
     let orders = await orderModel
       .find({ isDeleted: false })
       .populate("customerId", "name email")
+      .populate({
+        path: "products.productId",
+        populate: { path: "vendorId", select: "businessName ownerName email phone" }
+      })
       .populate("couponId", "code discount")
       .populate("addressId")
       .sort({ createdAt: -1 });
-
 
     let total = await orderModel.countDocuments({ isDeleted: false });
 
@@ -284,7 +285,10 @@ const singleOrder = async (req, res) => {
 
     let order = await orderModel.findOne({ _id: req.body._id })
       .populate("customerId", "name email phone")
-      .populate("products.productId")
+      .populate({
+        path: "products.productId",
+        populate: { path: "vendorId", select: "businessName ownerName email phone" }
+      })
       .populate("addressId")
       .populate("couponId");
 
@@ -397,6 +401,7 @@ const updateVendorOrderStatus = async (req, res) => {
       return res.status(403).json({ success: false, status: 403, message: "No items found for this vendor in order" });
     }
 
+    order.orderStatus = status;
     order.updatedAt = Date.now();
     await order.save();
 
