@@ -35,40 +35,57 @@ const deleteExpiredCoupons = async () => {
 deleteExpiredCoupons();
 setInterval(deleteExpiredCoupons, 10 * 60 * 1000);
 
+const generateUniqueCode = async (prefix = "SAVE") => {
+    let unique = false;
+    let code = "";
+    let attempts = 0;
+    while (!unique && attempts < 100) {
+        attempts++;
+        const randomNum = Math.floor(100 + Math.random() * 900);
+        code = `${prefix}${randomNum}`;
+        const existing = await CouponModel.findOne({ code });
+        if (!existing) {
+            unique = true;
+        }
+    }
+    return code;
+};
+
 //Add
 const add = async (req,res) => {
     try{
         const incomingData = req.body || {};
-        const existingData = await CouponModel.findOne({code: incomingData.code});
+        let finalCode = incomingData.code && incomingData.code.trim() !== "" 
+            ? incomingData.code.trim().toUpperCase() 
+            : await generateUniqueCode("SAVE");
+
+        const existingData = await CouponModel.findOne({code: finalCode});
         if(existingData){
             return res.json({
                 status:400,
                 success:false,
-                message:"Data Already Exists"
+                message:"Coupon Code Already Exists"
             })
         }
         let coupon = new CouponModel();
-        coupon.code = req.body.code;
+        coupon.code = finalCode;
         coupon.discount = req.body.discount;
         coupon.discountType = req.body.discountType;
         coupon.minAmoutSpend = req.body.minAmoutSpend;
         coupon.expiryDate = req.body.expiryDate;
 
-         await coupon.save();
+        await coupon.save();
         res.json({
             status:201,
             success:true,
             message: "Coupon Added Successfully",
             data:coupon
         })
-
-        }catch(err){
-            console.log(err);
-            
-        }
-
-       
+    }catch(err){
+        console.log(err);
+        res.json({ status: 500, success: false, message: err.message });
     }
+}
 //All
 const all = async(req,res) =>{
     try{
@@ -251,17 +268,21 @@ const vendorAdd = async (req, res) => {
         const vendorId = req.vendor._id;
         const { code, discount, discountType, minAmoutSpend, expiryDate } = req.body;
 
-        if (!code || !discount) {
-            return res.status(400).json({ success: false, status: 400, message: "Code and discount are required" });
+        if (!discount) {
+            return res.status(400).json({ success: false, status: 400, message: "Discount value is required" });
         }
 
-        const existing = await CouponModel.findOne({ code: code.toUpperCase() });
+        let finalCode = code && code.trim() !== "" 
+            ? code.trim().toUpperCase() 
+            : await generateUniqueCode("STORE");
+
+        const existing = await CouponModel.findOne({ code: finalCode });
         if (existing) {
             return res.status(400).json({ success: false, status: 400, message: "Coupon code already exists" });
         }
 
         const newCoupon = new CouponModel({
-            code: code.toUpperCase(),
+            code: finalCode,
             discount,
             discountType: discountType || "Percentage",
             minAmoutSpend: Number(minAmoutSpend) || 0,
