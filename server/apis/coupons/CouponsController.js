@@ -1,4 +1,40 @@
-const CouponModel = require('../coupons/CouponsModel')
+const CouponModel = require('../coupons/CouponsModel');
+
+// Auto Hard Delete Expired Coupons
+const deleteExpiredCoupons = async () => {
+    try {
+        const coupons = await CouponModel.find({ expiryDate: { $ne: "", $exists: true } });
+        const now = new Date();
+        const expiredIds = [];
+
+        for (const c of coupons) {
+            if (!c.expiryDate) continue;
+            let exp = new Date(c.expiryDate);
+            if (isNaN(exp.getTime())) continue;
+
+            // If expiryDate is YYYY-MM-DD (10 chars), set time to end of day 23:59:59.999
+            if (/^\d{4}-\d{2}-\d{2}$/.test(c.expiryDate)) {
+                exp.setHours(23, 59, 59, 999);
+            }
+
+            if (exp < now) {
+                expiredIds.push(c._id);
+            }
+        }
+
+        if (expiredIds.length > 0) {
+            await CouponModel.deleteMany({ _id: { $in: expiredIds } });
+            console.log(`[Auto Hard Delete] Deleted ${expiredIds.length} expired coupon(s).`);
+        }
+    } catch (err) {
+        console.error("Error in deleteExpiredCoupons:", err);
+    }
+};
+
+// Run cleanup on module initialization and every 10 minutes
+deleteExpiredCoupons();
+setInterval(deleteExpiredCoupons, 10 * 60 * 1000);
+
 //Add
 const add = async (req,res) => {
     try{
@@ -36,7 +72,8 @@ const add = async (req,res) => {
 //All
 const all = async(req,res) =>{
     try{
-        const allData = await CouponModel.find({});
+        await deleteExpiredCoupons();
+        const allData = await CouponModel.find({}).populate('vendorId', 'businessName ownerName email').sort({ _id: -1 });
         const total = await CouponModel.countDocuments({});
         res.json({
             status:200,
@@ -44,15 +81,20 @@ const all = async(req,res) =>{
             message:"Coupons Loaded Successfully",
             total:total,
             data: allData
-
         })
     }catch(err){
         console.log(err);
+        res.json({
+            status:500,
+            success:false,
+            message:"Internal server error"
+        });
     }
 }
 //Single
 const single = async (req,res)=>{
     try{
+        await deleteExpiredCoupons();
         const Coupon_id = req.body?._id;
         if(!Coupon_id){
             res.json({
@@ -130,37 +172,35 @@ const DeleteOne = async(req,res)=>{
         errmsg.push("_id is Required");
     }
     if(errmsg.length>0){
-        res.json({
-            status:404,
+        return res.json({
+            status:400,
             message:errmsg,
             success:false
         });
     }else{
-        CouponModel.findOne({_id:req.body._id}).then((existCoupon)=>{
-            if(existCoupon == null){
-                res.json({
+        try {
+            const existCoupon = await CouponModel.findOne({_id:req.body._id});
+            if(!existCoupon){
+                return res.json({
                     status:404,
                     success:false,
                     message:"Coupon Not Found"
                 });
-            }else{
-                CouponModel.deleteOne({_id:req.body._id}).then(()=>{
-                    res.json({
-                        status:200,
-                        success:true,
-                        message:"Coupon Deleted Successfully"
-                    });
-                }).catch((err)=>{
-                    console.log(err);                    
-                })
             }
-        }).catch((err)=>{
-            res.json({
-            status:500,
-            success:false,
-            message:"Internal server"
-        })
-        })
+            await CouponModel.deleteOne({_id:req.body._id});
+            return res.json({
+                status:200,
+                success:true,
+                message:"Coupon Deleted Successfully"
+            });
+        }catch(err){
+            console.log(err);
+            return res.json({
+                status:500,
+                success:false,
+                message:"Internal server error"
+            });
+        }
     }
 };
 
@@ -245,6 +285,7 @@ const vendorAdd = async (req, res) => {
 
 const vendorAll = async (req, res) => {
     try {
+        await deleteExpiredCoupons();
         const vendorId = req.vendor._id;
         const coupons = await CouponModel.find({
             $or: [
@@ -290,5 +331,5 @@ const vendorDelete = async (req, res) => {
 
 module.exports = {
     add, all, update, single, DeleteOne, softDelete,
-    vendorAdd, vendorAll, vendorDelete
+    vendorAdd, vendorAll, vendorDelete, deleteExpiredCoupons
 }
