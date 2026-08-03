@@ -81,6 +81,17 @@ const addQuery = async (req, res) => {
 
     const saved = await newQuery.save();
 
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("query_updated", { type: "NEW_QUERY", data: saved });
+      io.emit("new_notification", {
+        userId: saved.userId,
+        title: "New Query Submitted",
+        message: `Query ${saved.queryId} submitted by ${saved.name}`,
+        queryId: saved.queryId
+      });
+    }
+
     return res.json({
       status: 201,
       success: true,
@@ -206,6 +217,17 @@ const replyQuery = async (req, res) => {
     });
 
     const updated = await queryItem.save();
+
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("query_updated", { type: "QUERY_REPLIED", data: updated });
+      io.emit("new_notification", {
+        userId: updated.userId,
+        title: "Query Replied",
+        message: `Admin replied to your query ${updated.queryId}`,
+        queryId: updated.queryId
+      });
+    }
 
     return res.json({
       status: 200,
