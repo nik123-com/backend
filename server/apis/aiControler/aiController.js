@@ -152,14 +152,22 @@ const generateAnnouncementDescription = async (req, res) => {
       return res.status(400).json({ success: false, status: 400, message: "Announcement title is required" });
     }
 
-    const prompt = `You are writing an official platform announcement / notice for an e-commerce platform.
+    const audienceGreeting = targetAudience && targetAudience.toLowerCase().includes("vendor")
+      ? "Dear vendor,"
+      : targetAudience && targetAudience.toLowerCase().includes("customer")
+      ? "Dear customer,"
+      : "Dear Everyone,";
+
+    const prompt = `You are writing an official platform announcement notice for the e-commerce platform "Aventra".
 Announcement Title: "${title}"
-Target Audience: "${targetAudience || 'Customers and Vendors'}"
+Target Audience: "${targetAudience || 'Everyone'}"
 Priority Level: "${priority || 'Normal'}"
 
-Write a clear, professional, well-structured announcement notice description based on this title. 
-Keep it clear, formal, and engaging.
-Do not use markdown bold, italics, or heading tags. Return clean plain text.`;
+Strict Rules:
+1. Platform Name: Always refer to the platform as "Aventra".
+2. Length: Word count MUST be strictly between 50 and 300 words.
+3. Starting Sentence: You MUST start the text exactly with '${audienceGreeting} This is to inform you that...'
+4. Plain Text: Do not use any markdown bold (**), italics (*), or heading (#) symbols. Return pure plain text.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
