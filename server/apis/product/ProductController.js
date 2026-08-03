@@ -116,17 +116,17 @@ const single = async (req, res) => {
         const ProductId = req.body?._id;
 
         if (!ProductId) {
-            res.json({
+            return res.json({
                 status: 400,
                 success: false,
                 message: "_id is required"
             })
         }
 
-        const Product = await ProductModel.findOne({_id: ProductId }).populate("category_id")
+        const Product = await ProductModel.findOne({_id: ProductId }).populate("category_id").populate("brand_id")
 
         if (!Product) {
-            res.json({
+            return res.json({
                 status: 404,
                 success: false,
                 message: "Product not found"
@@ -155,7 +155,7 @@ const update = async (req, res) => {
         const incomingData = req.body;
 
         if (!ProductId) {
-            res.json({
+            return res.json({
                 status: 400,
                 success: false,
                 message: "_id is required"
@@ -165,7 +165,7 @@ const update = async (req, res) => {
         const ProductData = await ProductModel.findOne({_id: ProductId })
 
         if (!ProductData) {
-            res.json({
+            return res.json({
                 status: 404,
                 success: false,
                 message: "Product not found"
@@ -179,17 +179,36 @@ const update = async (req, res) => {
             if (incomingData.description) {
                 ProductData.description = incomingData.description;
             }
+            if (incomingData.price !== undefined && incomingData.price !== null && incomingData.price !== "") {
+                ProductData.price = incomingData.price;
+            }
+            if (incomingData.category_id) {
+                ProductData.category_id = incomingData.category_id;
+            }
+            if (incomingData.brand_id) {
+                ProductData.brand_id = incomingData.brand_id;
+            }
             if (incomingData.status !== undefined) {
                 ProductData.status = incomingData.status === "true" || incomingData.status === true;
             }
-            if (req.file) {
-                ProductData.image = req.file.filename;
-            }
-            if (req.categoryId) {
-                ProductData.category_id = req.category_id;
-            }
-            if (req.brand_id) {
-                ProductData.brand_id = req.brand_id;
+            if (req.files && req.files.length > 0) {
+                try {
+                    const urls = await Promise.all(
+                        req.files.map(async (f) => {
+                            return await uploadImg(f.buffer);
+                        })
+                    );
+                    ProductData.image = urls;
+                } catch (imgErr) {
+                    console.log(imgErr);
+                }
+            } else if (req.file) {
+                try {
+                    const url = await uploadImg(req.file.buffer);
+                    ProductData.image = [url];
+                } catch (imgErr) {
+                    console.log(imgErr);
+                }
             }
             ProductData.updatedAt = Date.now();
             const isNowOn = ProductData.status === true;
@@ -224,7 +243,7 @@ const update = async (req, res) => {
 
             res.json({
                 status: 200,
-                succes: true,
+                success: true,
                 message: "Product Updated Successfully",
                 data: updatedProduct
             })
