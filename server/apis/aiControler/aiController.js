@@ -145,11 +145,44 @@ const suggestPrice = async (req, res) => {
   }
 };
 
+const generateAnnouncementDescription = async (req, res) => {
+  try {
+    const { title, targetAudience, priority } = req.body;
+    if (!title) {
+      return res.status(400).json({ success: false, status: 400, message: "Announcement title is required" });
+    }
+
+    const prompt = `You are writing an official platform announcement / notice for an e-commerce platform.
+Announcement Title: "${title}"
+Target Audience: "${targetAudience || 'Customers and Vendors'}"
+Priority Level: "${priority || 'Normal'}"
+
+Write a clear, professional, well-structured announcement notice description based on this title. 
+Keep it clear, formal, and engaging.
+Do not use markdown bold, italics, or heading tags. Return clean plain text.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
+
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      description: response.text
+    });
+  } catch (err) {
+    console.error("Error generating announcement description:", err);
+    return res.status(500).json({ success: false, status: 500, message: err.message || "Failed to generate AI description" });
+  }
+};
+
 module.exports = {
   main,
   generateProductDescription,
   generateSeoData,
   generateMarketingCaption,
-  suggestPrice
+  suggestPrice,
+  generateAnnouncementDescription
 };
 

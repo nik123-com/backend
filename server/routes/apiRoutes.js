@@ -46,6 +46,7 @@ router.post("/resetPassword/:token", userController.resetPassword)
 
 //AI integration
 router.post("/aiCall", aiController.main)
+router.post("/ai/announcement-description", aiController.generateAnnouncementDescription)
 
 router.use(require("../middleware/AdminTokenChecker"))
 
