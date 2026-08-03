@@ -12,6 +12,7 @@ const OrderController = require('../apis/order/OrderController')
 const productController = require('../apis/product/ProductController')
 const queryController = require('../apis/query/QueryController')
 const notificationController = require('../apis/notification/NotificationController')
+const announcementController = require('../apis/announcement/AnnouncementController')
 const multer = require('multer')
 const upload = multer({ storage: multer.memoryStorage() })
 const router = require("express").Router()
@@ -33,6 +34,9 @@ router.post('/review/single', reviewController.single)
 router.post('/query/add', upload.single('evidenceFile'), queryController.addQuery)
 router.post('/query/all', queryController.getCustomerQueries)
 router.post('/query/feedback', queryController.submitFeedback)
+
+// Announcement Route
+router.post('/announcement/all', announcementController.getUserAnnouncements)
 
 router.use(require("../middleware/customerTokenChecker"))
 

@@ -136,11 +136,18 @@ router.post('/query/reply', upload.single('adminAttachment'), queryController.re
 // router.post('/wishlist/delete',wishlistController.DeleteOne)
 
 const VendorController = require('../apis/vendor/VendorController')
+const announcementController = require('../apis/announcement/AnnouncementController')
 
 // Admin Vendor Management
 router.post('/vendor/all', VendorController.getAllVendors)
 router.post('/vendor/approve', VendorController.approveVendor)
 router.post('/vendor/reject', VendorController.rejectVendor)
 router.post('/vendor/toggleBlock', VendorController.toggleBlockVendor)
+
+// Announcement Management
+router.post('/announcement/add', announcementController.addAnnouncement)
+router.post('/announcement/all', announcementController.getAllAnnouncements)
+router.post('/announcement/delete', announcementController.deleteAnnouncement)
+router.post('/announcement/user', announcementController.getUserAnnouncements)
 
 module.exports = router; 
