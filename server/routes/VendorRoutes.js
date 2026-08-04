@@ -61,6 +61,7 @@ router.post('/ai/description', aiController.generateProductDescription);
 router.post('/ai/seo', aiController.generateSeoData);
 router.post('/ai/caption', aiController.generateMarketingCaption);
 router.post('/ai/price-suggest', aiController.suggestPrice);
+router.post('/ai/review-reply', aiController.generateReviewReply);
 
 // Announcements for Vendors
 const announcementController = require('../apis/announcement/AnnouncementController');

@@ -7,7 +7,7 @@ const notificationSchema = new mongoose.Schema({
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
     type: { 
         type: String, 
-        enum: ['wishlist_invite', 'invite_accepted', 'invite_rejected', 'stock_available', 'general'], 
+        enum: ['wishlist_invite', 'invite_accepted', 'invite_rejected', 'stock_available', 'general', 'review_reply'], 
         default: 'general' 
     },
     status: { 

@@ -185,12 +185,45 @@ Strict Rules:
   }
 };
 
+const generateReviewReply = async (req, res) => {
+  try {
+    const { comment, rating, productName } = req.body;
+    if (!comment) {
+      return res.status(400).json({ success: false, status: 400, message: "Review comment is required" });
+    }
+
+    const prompt = `You are a polite, appreciative store owner/vendor on an e-commerce platform.
+A customer wrote the following review for the product "${productName || 'our product'}":
+Rating: ${rating || 5} out of 5 stars
+Review comment: "${comment}"
+
+Write a warm, polite, professional, and helpful official store reply to this customer review.
+Keep it concise (1 to 3 sentences max). Include friendly emojis if appropriate. Return pure plain text only without markdown formatting.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
+
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      reply: response.text ? response.text.trim() : "Thank you for your feedback!"
+    });
+  } catch (err) {
+    console.error("Error generating review reply:", err);
+    return res.status(500).json({ success: false, status: 500, message: err.message || "Failed to generate AI reply" });
+  }
+};
+
 module.exports = {
   main,
   generateProductDescription,
   generateSeoData,
   generateMarketingCaption,
   suggestPrice,
-  generateAnnouncementDescription
+  generateAnnouncementDescription,
+  generateReviewReply
 };
+
 

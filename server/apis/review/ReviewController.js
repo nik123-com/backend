@@ -326,6 +326,39 @@ const vendorReplyReview = async (req, res) => {
         review.repliedAt = new Date();
         await review.save();
 
+        // Create notification for the customer who posted the review
+        if (review.userId) {
+            try {
+                const Notification = require('../notification/NotificationModel');
+                const productName = review.productId?.name || "a product you reviewed";
+                const notificationMsg = `Store replied to your review on "${productName}": "${reply}"`;
+
+                const newNotif = new Notification({
+                    senderId: vendorId,
+                    recipientId: review.userId,
+                    productId: review.productId?._id || review.productId,
+                    type: 'review_reply',
+                    status: 'pending',
+                    message: notificationMsg
+                });
+                await newNotif.save();
+
+                const io = req.app.get("io");
+                if (io) {
+                    io.emit("new_notification", {
+                        recipientId: review.userId,
+                        userId: review.userId.toString(),
+                        title: "Store Replied to Your Review",
+                        message: notificationMsg,
+                        productId: review.productId?._id || review.productId,
+                        type: 'review_reply'
+                    });
+                }
+            } catch (notifErr) {
+                console.error("Error creating review reply notification:", notifErr);
+            }
+        }
+
         return res.status(200).json({
             success: true,
             status: 200,
