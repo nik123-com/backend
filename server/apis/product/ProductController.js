@@ -505,7 +505,7 @@ const vendorAdd = async (req, res) => {
         return res.status(201).json({
             success: true,
             status: 201,
-            message: isDraft ? "Product saved as Draft" : "Product published successfully!",
+            message: isDraft ? "Product saved as Draft" : "Published successfully",
             data: newProduct
         });
     } catch (err) {
@@ -578,10 +578,11 @@ const vendorUpdate = async (req, res) => {
 
         const updated = await ProductModel.findByIdAndUpdate(_id, { $set: updates }, { new: true });
 
+        const isDraftVal = updates.isDraft === true || updates.isDraft === "true";
         return res.status(200).json({
             success: true,
             status: 200,
-            message: "Product updated successfully!",
+            message: isDraftVal ? "Product saved as Draft" : "Published successfully",
             data: updated
         });
     } catch (err) {
