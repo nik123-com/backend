@@ -131,7 +131,7 @@ const Register = (req, res) => {
 
 const all = async (req, res) => {
   try {
-    const userData = await CustomerModel.find({status: true}).populate("userId").populate("assignedCoupons");
+    const userData = await CustomerModel.find({status: true}).populate("userId") //find({status: true})
     if (userData.length === 0) {
       return res.send({
         status: 404,
@@ -140,62 +140,15 @@ const all = async (req, res) => {
       });
     }
 
-    const OrderModel = require('../order/OrderModel');
-    const ReviewModel = require('../review/ReviewModel');
-
-    const customerList = await Promise.all(userData.map(async (cust) => {
-      const custObj = cust.toObject();
-      const orders = await OrderModel.find({ customerId: cust._id, isDeleted: false });
-      const reviews = cust.userId ? await ReviewModel.find({ userId: cust.userId._id || cust.userId }) : [];
-
-      let totalOrders = orders.length;
-      let acceptedOrders = 0;
-      let cancelledOrders = 0;
-      let totalSpend = 0;
-      let lastOrderDate = cust.created_at || new Date();
-
-      orders.forEach(o => {
-        let isCancelled = o.orderStatus === 'cancelled' || o.products?.some(p => p.itemStatus === 'cancelled');
-        if (isCancelled) {
-          cancelledOrders++;
-        } else {
-          acceptedOrders++;
-          totalSpend += (o.grandTotal || 0);
-        }
-        if (o.createdAt && new Date(o.createdAt) > new Date(lastOrderDate)) {
-          lastOrderDate = o.createdAt;
-        }
-      });
-
-      let reviewCount = reviews.length;
-      let avgRating = reviewCount > 0 ? Number((reviews.reduce((acc, r) => acc + (r.rating || 0), 0) / reviewCount).toFixed(1)) : 0;
-      let daysSinceLastOrder = Math.max(0, Math.floor((Date.now() - new Date(lastOrderDate).getTime()) / (1000 * 60 * 60 * 24)));
-      let acceptanceRate = totalOrders > 0 ? Math.round((acceptedOrders / totalOrders) * 100) : 100;
-
-      custObj.metrics = {
-        totalOrders,
-        acceptedOrders,
-        cancelledOrders,
-        totalSpend,
-        reviewCount,
-        avgRating,
-        daysSinceLastOrder,
-        acceptanceRate
-      };
-
-      return custObj;
-    }));
-
     return res.send({
       status: 200,
       message: "All customers",
       success: true,
-      totalcate: customerList.length,
-      data: customerList,
+      totalcate: userData.length,
+      data: userData,
     });
 
   } catch (err) {
-    console.error("Error in customer all:", err);
     return res.send({
       status: 500,
       message: "Internal Server Error",
@@ -216,7 +169,7 @@ const single = async (req, res) => {
       })
     }
 
-    const customer = await CustomerModel.findOne({ _id: customerId }).populate("assignedCoupons");
+    const customer = await customerModel.findOne({ _id: customerId })
 
     if (!customer) {
       return res.json({
@@ -254,7 +207,7 @@ const update = async (req, res) => {
       })
     }
 
-    const customerData = await CustomerModel.findOne({ _id: customerId })
+    const customerData = await customerModel.findOne({ _id: customerId })
 
     if (!customerData) {
       return res.json({
@@ -316,7 +269,7 @@ const DeleteOne = (req, res) => {
       success: false,
     });
   } else {
-    CustomerModel
+    customerModel
       .findOne({ _id: req.body._id })
       .then((userData) => {
         if (userData == null) {
@@ -326,7 +279,7 @@ const DeleteOne = (req, res) => {
             success: false,
           });
         } else {
-          CustomerModel.deleteOne({ _id: req.body._id }).then(() => {
+          customerModel.deleteOne({ _id: req.body._id }).then(() => {
             return res.send({
               status: 200,
               message: "delete",
@@ -419,187 +372,6 @@ const toggleBlock = async (req, res) => {
   }
 };
 
-const updateRank = async (req, res) => {
-  try {
-    const { customerId, rank, rankScore, activityStatus, activityScore, aiSummary } = req.body;
-    if (!customerId) {
-      return res.status(400).json({ success: false, status: 400, message: "CustomerId is required" });
-    }
-    const customer = await CustomerModel.findById(customerId);
-    if (!customer) {
-      return res.status(404).json({ success: false, status: 404, message: "Customer not found" });
-    }
-
-    if (rank) customer.rank = rank;
-    if (rankScore !== undefined) customer.rankScore = Number(rankScore);
-    if (activityStatus) customer.activityStatus = activityStatus;
-    if (activityScore !== undefined) customer.activityScore = Number(activityScore);
-    if (aiSummary !== undefined) customer.aiSummary = aiSummary;
-    customer.rankUpdatedAt = new Date();
-
-    await customer.save();
-    return res.status(200).json({
-      success: true,
-      status: 200,
-      message: "Customer rank and activity status updated successfully!",
-      data: customer
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, status: 500, message: err.message });
-  }
-};
-
-const CouponModel = require('../coupons/CouponsModel');
-
-const getRankAndRewards = async (req, res) => {
-  try {
-    const userId = req.customer?.userId || req.customer?._id;
-    let customer = await CustomerModel.findOne({ userId: userId }).populate("assignedCoupons");
-    if (!customer && req.customer?.email) {
-      customer = await CustomerModel.findOne({ email: req.customer.email }).populate("assignedCoupons");
-    }
-
-    if (!customer) {
-      return res.status(404).json({ success: false, status: 404, message: "Customer profile not found" });
-    }
-
-    const tierCoupons = await CouponModel.find({
-      status: true,
-      $or: [
-        { targetTier: customer.rank },
-        { targetTier: 'All' },
-        { targetCustomerId: customer._id },
-        { _id: { $in: customer.assignedCoupons || [] } }
-      ]
-    });
-
-    return res.status(200).json({
-      success: true,
-      status: 200,
-      data: {
-        customerName: customer.name,
-        email: customer.email,
-        rank: customer.rank || 'Bronze',
-        rankScore: customer.rankScore || 0,
-        activityStatus: customer.activityStatus || 'Moderately Active',
-        activityScore: customer.activityScore || 50,
-        aiSummary: customer.aiSummary || 'Welcome! Keep shopping and leaving reviews to earn premium status rewards.',
-        rankUpdatedAt: customer.rankUpdatedAt,
-        coupons: tierCoupons
-      }
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, status: 500, message: err.message });
-  }
-};
-
-const approveAiEvaluation = async (req, res) => {
-  try {
-    const { customerId, action, rank, rankScore, activityStatus, aiSummary, customCoupon } = req.body;
-    if (!customerId) {
-      return res.status(400).json({ success: false, status: 400, message: "Customer ID is required" });
-    }
-
-    const customer = await CustomerModel.findById(customerId);
-    if (!customer) {
-      return res.status(404).json({ success: false, status: 404, message: "Customer not found" });
-    }
-
-    if (action === 'reject') {
-      customer.aiEvaluationStatus = 'Rejected';
-      customer.pendingRank = null;
-      customer.pendingRankScore = null;
-      customer.pendingActivityStatus = null;
-      customer.pendingAiSummary = "";
-      customer.pendingRewardCoupon = null;
-      await customer.save();
-
-      return res.status(200).json({
-        success: true,
-        status: 200,
-        message: "AI evaluation rejected by Admin",
-        data: customer
-      });
-    }
-
-    // Approve or Approve with Custom Edits
-    const finalRank = rank || customer.pendingRank || customer.rank || 'Bronze';
-    const finalScore = rankScore !== undefined ? Number(rankScore) : (customer.pendingRankScore || customer.rankScore || 50);
-    const finalActivity = activityStatus || customer.pendingActivityStatus || customer.activityStatus || 'Moderately Active';
-    const finalSummary = aiSummary || customer.pendingAiSummary || customer.aiSummary || 'Admin approved rank status.';
-    const couponToIssue = customCoupon || customer.pendingRewardCoupon;
-
-    customer.rank = finalRank;
-    customer.rankScore = finalScore;
-    customer.activityStatus = finalActivity;
-    customer.activityScore = finalScore;
-    customer.aiSummary = finalSummary;
-    customer.rankUpdatedAt = new Date();
-    customer.aiEvaluationStatus = 'Approved';
-
-    // Clear pending fields
-    customer.pendingRank = null;
-    customer.pendingRankScore = null;
-    customer.pendingActivityStatus = null;
-    customer.pendingAiSummary = "";
-    customer.pendingRewardCoupon = null;
-
-    let createdCoupon = null;
-    if (couponToIssue && couponToIssue.code) {
-      let existingCoupon = await CouponModel.findOne({ code: couponToIssue.code.toUpperCase() });
-      if (!existingCoupon) {
-        existingCoupon = new CouponModel({
-          code: couponToIssue.code.toUpperCase(),
-          discount: couponToIssue.discount || "20%",
-          discountType: couponToIssue.discountType || "percentage",
-          minAmoutSpend: Number(couponToIssue.minAmoutSpend) || 0,
-          expiryDate: couponToIssue.expiryDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          targetTier: finalRank,
-          isAiReward: true,
-          targetCustomerId: customer._id,
-          status: true
-        });
-        await existingCoupon.save();
-      }
-      createdCoupon = existingCoupon;
-
-      if (!customer.assignedCoupons) customer.assignedCoupons = [];
-      if (!customer.assignedCoupons.includes(existingCoupon._id)) {
-        customer.assignedCoupons.push(existingCoupon._id);
-      }
-    }
-
-    await customer.save();
-
-    // Trigger real-time Notification for Customer
-    if (customer.userId) {
-      try {
-        const couponMsg = createdCoupon ? ` Unlocked Reward Coupon: ${createdCoupon.code} (${createdCoupon.discount} OFF)!` : '';
-        await NotificationModel.create({
-          recipientId: customer.userId._id || customer.userId,
-          type: 'rank_reward',
-          status: 'pending',
-          message: `🏆 [Rank & Reward Approved] Admin has approved your AI evaluation! You are now ranked as ${finalRank} Customer (${finalActivity}).${couponMsg}`
-        });
-      } catch (e) {
-        console.error("Error creating approved notification:", e);
-      }
-    }
-
-    const updatedCustomer = await CustomerModel.findById(customerId).populate("assignedCoupons");
-
-    return res.status(200).json({
-      success: true,
-      status: 200,
-      message: `AI Evaluation approved! ${customer.name} is now ${finalRank} Customer.`,
-      data: updatedCustomer
-    });
-  } catch (err) {
-    console.error("Error in approveAiEvaluation:", err);
-    return res.status(500).json({ success: false, status: 500, message: err.message });
-  }
-};
-
 module.exports = {
-  Register, all, single, update, DeleteOne, softDelete, toggleBlock, updateRank, getRankAndRewards, approveAiEvaluation
+  Register, all, single, update, DeleteOne, softDelete, toggleBlock
 }

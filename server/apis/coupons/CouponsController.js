@@ -350,70 +350,7 @@ const vendorDelete = async (req, res) => {
     }
 };
 
-const CustomerModel = require('../customer/CustomerModel');
-const NotificationModel = require('../notification/NotificationModel');
-
-const assignRewardCoupon = async (req, res) => {
-    try {
-        const { code, discount, discountType, minAmoutSpend, expiryDate, targetTier, customerId } = req.body;
-        if (!discount) {
-            return res.status(400).json({ success: false, status: 400, message: "Discount value is required" });
-        }
-
-        let finalCode = code && code.trim() !== "" 
-            ? code.trim().toUpperCase() 
-            : await generateUniqueCode(targetTier ? targetTier.replace(/\s+/g, '').toUpperCase() : "REWARD");
-
-        let existing = await CouponModel.findOne({ code: finalCode });
-        if (existing) {
-            finalCode = await generateUniqueCode("REWARD");
-        }
-
-        const coupon = new CouponModel({
-            code: finalCode,
-            discount: discount,
-            discountType: discountType || "percentage",
-            minAmoutSpend: Number(minAmoutSpend) || 0,
-            expiryDate: expiryDate || new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
-            targetTier: targetTier || "All",
-            isAiReward: true,
-            targetCustomerId: customerId || null,
-            status: true
-        });
-
-        await coupon.save();
-
-        if (customerId) {
-            const cust = await CustomerModel.findById(customerId);
-            if (cust) {
-                if (!cust.assignedCoupons) cust.assignedCoupons = [];
-                cust.assignedCoupons.push(coupon._id);
-                await cust.save();
-
-                if (cust.userId) {
-                    await NotificationModel.create({
-                        recipientId: cust.userId,
-                        type: 'rank_reward',
-                        status: 'pending',
-                        message: `🎁 [Reward Coupon] Special Reward Coupon ${coupon.code} (${coupon.discount} off) has been issued to your account!`
-                    });
-                }
-            }
-        }
-
-        return res.status(201).json({
-            success: true,
-            status: 201,
-            message: `Reward Coupon ${coupon.code} created and assigned successfully!`,
-            data: coupon
-        });
-    } catch (err) {
-        console.error("Error in assignRewardCoupon:", err);
-        return res.status(500).json({ success: false, status: 500, message: err.message });
-    }
-};
-
 module.exports = {
     add, all, update, single, DeleteOne, softDelete,
-    vendorAdd, vendorAll, vendorDelete, deleteExpiredCoupons, assignRewardCoupon
+    vendorAdd, vendorAll, vendorDelete, deleteExpiredCoupons
 }

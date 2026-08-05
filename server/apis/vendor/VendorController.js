@@ -18,8 +18,7 @@ module.exports = {
     getAllVendors,
     approveVendor,
     rejectVendor,
-    toggleBlockVendor,
-    getVendorCustomerRanks
+    toggleBlockVendor
 };
 
 // 1. Vendor Public Registration
@@ -403,50 +402,6 @@ async function toggleBlockVendor(req, res) {
             status: 200,
             message: `Vendor has been ${vendor.isBlocked ? 'blocked' : 'unblocked'}.`,
             data: vendor
-        });
-    } catch (err) {
-        return res.status(500).json({ success: false, status: 500, message: err.message });
-    }
-}
-
-async function getVendorCustomerRanks(req, res) {
-    try {
-        const CustomerModel = require('../customer/CustomerModel');
-        const customers = await CustomerModel.find({ status: true }).populate("assignedCoupons");
-        const list = await Promise.all(customers.map(async (cust) => {
-            const custObj = cust.toObject();
-            const orders = await OrderModel.find({ customerId: cust._id, isDeleted: false });
-            const reviews = cust.userId ? await ReviewModel.find({ userId: cust.userId }) : [];
-
-            let totalOrders = orders.length;
-            let acceptedOrders = orders.filter(o => o.orderStatus !== 'cancelled' && !o.products?.some(p => p.itemStatus === 'cancelled')).length;
-            let cancelledOrders = totalOrders - acceptedOrders;
-            let lastOrderDate = cust.created_at || new Date();
-            orders.forEach(o => {
-                if (o.createdAt && new Date(o.createdAt) > new Date(lastOrderDate)) {
-                    lastOrderDate = o.createdAt;
-                }
-            });
-            let daysSinceLastOrder = Math.max(0, Math.floor((Date.now() - new Date(lastOrderDate).getTime()) / (1000 * 60 * 60 * 24)));
-            let avgRating = reviews.length > 0 ? Number((reviews.reduce((a, r) => a + (r.rating || 0), 0) / reviews.length).toFixed(1)) : 0;
-
-            custObj.vendorInsight = {
-                totalOrders,
-                acceptedOrders,
-                cancelledOrders,
-                acceptanceRate: totalOrders > 0 ? Math.round((acceptedOrders / totalOrders) * 100) : 100,
-                daysSinceLastOrder,
-                reviewCount: reviews.length,
-                avgRating
-            };
-
-            return custObj;
-        }));
-
-        return res.status(200).json({
-            success: true,
-            status: 200,
-            data: list
         });
     } catch (err) {
         return res.status(500).json({ success: false, status: 500, message: err.message });

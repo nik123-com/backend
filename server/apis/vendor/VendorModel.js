@@ -50,10 +50,6 @@ const VendorSchema = new mongoose.Schema({
         completedSettlements: { type: Number, default: 0 },
         history: [WalletHistorySchema]
     },
-    activityStatus: { type: String, enum: ['Highly Active', 'Moderately Active', 'Dormant'], default: 'Moderately Active' },
-    activityScore: { type: Number, default: 50 },
-    lastActiveAt: { type: Date, default: Date.now },
-    aiActivitySummary: { type: String, default: "" },
     created_at: { type: Date, default: Date.now }
 });
 
