@@ -105,7 +105,11 @@ router.post('/customer/update', CustomerController.update)
 router.post('/customer/DeleteOne', CustomerController.DeleteOne)
 router.post('/customer/softDelete', CustomerController.softDelete)
 router.post('/customer/toggleBlock',CustomerController.toggleBlock)
-
+router.post('/customer/update-rank', CustomerController.updateRank)
+router.post('/customer/ai-evaluate-rank', aiController.evaluateCustomerRank)
+router.post('/customer/ai-evaluate-all', aiController.evaluateAllCustomersRank)
+router.post('/customer/approve-ai-evaluation', CustomerController.approveAiEvaluation)
+router.post('/vendor/ai-evaluate-activity', aiController.evaluateVendorActivity)
 
 //Coupon
 router.post('/coupon/add', CouponController.add)
@@ -114,6 +118,7 @@ router.post('/coupon/single', CouponController.single)
 router.post('/coupon/update', CouponController.update)
 router.post('/coupon/DeleteOne', CouponController.DeleteOne)
 router.post('/coupon/softDelete', CouponController.softDelete)
+router.post('/coupon/assign-reward', CouponController.assignRewardCoupon)
 
 //Order
 router.post('/order/count', OrderController.countOrders)

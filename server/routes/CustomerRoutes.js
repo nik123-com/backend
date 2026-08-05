@@ -63,10 +63,10 @@ router.post('/cart/add', CartController.add)
 router.post('/cart/DeleteOne', CartController.DeleteOne)
 router.post('/cart/increment', CartController.increment)
 router.post('/cart/decrement', CartController.decrement)
-//Address
 router.post('/address/add', AddressController.add);
 router.post('/address/all', AddressController.all);
-router.post('/coupon/all', CouponController.all)
+router.post('/coupon/all', CouponController.all);
+router.post('/customer/my-rank-rewards', CustomerController.getRankAndRewards);
 
 
 //Brand

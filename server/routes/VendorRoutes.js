@@ -41,6 +41,7 @@ router.post('/product/update-stock', productController.vendorUpdateStock);
 router.post('/order/all', OrderController.vendorOrders);
 router.post('/order/update-status', OrderController.updateVendorOrderStatus);
 router.post('/order/invoice', OrderController.vendorInvoice);
+router.post('/customer/rank-list', VendorController.getVendorCustomerRanks);
 
 // Coupons
 router.post('/coupon/add', CouponController.vendorAdd);
