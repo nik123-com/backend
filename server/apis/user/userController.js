@@ -176,14 +176,29 @@ const forgotPassword = async (req, res) => {
       },
     });
 
+    const clientUrl = (process.env.CLIENT_URL || req.headers.origin || req.headers.referer || "http://localhost:5173").replace(/\/+$/, "");
+    const resetUrl = `${clientUrl}/reset-password/${token}`;
+
     const mailOptions = {
       to: user.email,
       from: process.env.SMTP_USER,
       subject: "Password Reset Request",
       text: `You are receiving this because you (or someone else) have requested the reset of the password for your account.\n\n
         Please click on the following link, or paste this into your browser to complete the process:\n\n
-        http://localhost:5173/reset-password/${token}\n\n
+        ${resetUrl}\n\n
         If you did not request this, please ignore this email and your password will remain unchanged.\n`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+          <h2>Password Reset Request</h2>
+          <p>You requested a password reset for your account.</p>
+          <p>Click the link below to set a new password:</p>
+          <p style="margin: 24px 0;">
+            <a href="${resetUrl}" style="background-color: #81c408; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Reset Password</a>
+          </p>
+          <p style="font-size: 13px; color: #777;">Or copy and paste this URL into your browser: <br/><a href="${resetUrl}">${resetUrl}</a></p>
+          <p style="font-size: 12px; color: #999;">If you did not request a password reset, please ignore this email.</p>
+        </div>
+      `
     };
 
     transporter.sendMail(mailOptions, (err) => {
