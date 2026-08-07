@@ -3,6 +3,8 @@ const userModel = require("../user/userModel");
 const ProductModel = require("../product/ProductModel");
 const OrderModel = require("../order/OrderModel");
 const ReviewModel = require("../review/ReviewModel");
+const CouponModel = require("../coupons/CouponsModel");
+const NotificationModel = require("../notification/NotificationModel");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const skey = "SecreteKey";
@@ -19,7 +21,9 @@ module.exports = {
     approveVendor,
     rejectVendor,
     toggleBlockVendor,
-    allotRank
+    allotRank,
+    checkRankReward,
+    dismissRewardPopup
 };
 
 // 1. Vendor Public Registration
@@ -411,7 +415,7 @@ async function toggleBlockVendor(req, res) {
 
 async function allotRank(req, res) {
     try {
-        const { vendorId, rank } = req.body;
+        const { vendorId, rank, discount, discountType, minAmoutSpend, expiryDate, couponCode: customCode } = req.body;
         if (!vendorId) {
             return res.status(400).json({ success: false, status: 400, message: "Vendor ID is required" });
         }
@@ -427,15 +431,137 @@ async function allotRank(req, res) {
         }
 
         vendor.rank = numericRank;
+        vendor.rewardPopupShown = false;
+
+        let generatedCoupon = null;
+        // Automatically generate Reward Coupon if vendor is allotted Rank 1
+        if (numericRank === 1) {
+            const randomCode = Math.floor(100 + Math.random() * 900);
+            const couponCode = customCode && customCode.trim() !== ""
+                ? customCode.trim().toUpperCase()
+                : `VENDOR-RANK1-${randomCode}`;
+
+            let defaultExp = new Date();
+            defaultExp.setDate(defaultExp.getDate() + 30);
+            const defaultExpStr = defaultExp.toISOString().split('T')[0];
+
+            const newCoupon = new CouponModel({
+                code: couponCode,
+                discount: discount ? String(discount) : "20",
+                discountType: discountType || "Percentage",
+                minAmoutSpend: minAmoutSpend ? Number(minAmoutSpend) : 0,
+                expiryDate: expiryDate || defaultExpStr,
+                vendorId: vendor._id,
+                isReward: true,
+                rewardType: "Vendor Rank 1 Special Reward",
+                status: true
+            });
+
+            await newCoupon.save();
+            vendor.latestRewardCoupon = couponCode;
+            generatedCoupon = couponCode;
+        }
+
         await vendor.save();
+
+        // Create Notification for Vendor
+        if (vendor.userId) {
+            try {
+                const notifMsg = numericRank === 1
+                    ? `🏆 Your store "${vendor.businessName}" has been allotted Rank #1! You received an exclusive Reward Coupon: '${generatedCoupon}'`
+                    : `🏆 Admin has allotted Rank #${numericRank} to your store "${vendor.businessName}".`;
+
+                await NotificationModel.create({
+                    senderId: req.decoded ? req.decoded.userId : null,
+                    recipientId: vendor.userId,
+                    type: 'rank_allotment',
+                    status: 'pending',
+                    message: notifMsg
+                });
+            } catch (notifErr) {
+                console.error("Error creating vendor rank notification:", notifErr);
+            }
+        }
 
         return res.status(200).json({
             success: true,
             status: 200,
-            message: `Rank ${numericRank} allotted to store "${vendor.businessName || 'Vendor'}" successfully.`,
-            data: vendor
+            message: numericRank === 1
+                ? `Rank 1 allotted to store "${vendor.businessName}"! Reward coupon '${generatedCoupon}' automatically generated.`
+                : `Rank ${numericRank} allotted to store "${vendor.businessName}" successfully.`,
+            data: vendor,
+            rewardCoupon: generatedCoupon
         });
     } catch (err) {
         return res.status(500).json({ success: false, status: 500, message: err.message });
+    }
+}
+
+async function checkRankReward(req, res) {
+    try {
+        const userId = req.body.userId || (req.decoded && req.decoded.userId);
+        const email = req.decoded && req.decoded.email;
+
+        let vendor = null;
+        if (userId) {
+            vendor = await VendorModel.findOne({ userId });
+        }
+        if (!vendor && email) {
+            vendor = await VendorModel.findOne({ email });
+        }
+
+        if (!vendor) {
+            return res.status(404).json({ status: 404, success: false, message: "Vendor not found" });
+        }
+
+        let couponDetails = null;
+        if (vendor.latestRewardCoupon) {
+            couponDetails = await CouponModel.findOne({ code: vendor.latestRewardCoupon });
+        }
+        if (!couponDetails && vendor.rank === 1) {
+            couponDetails = await CouponModel.findOne({ vendorId: vendor._id, isReward: true }).sort({ _id: -1 });
+        }
+
+        return res.status(200).json({
+            status: 200,
+            success: true,
+            rewardPopupShown: false,
+            rank: vendor.rank || 1,
+            businessName: vendor.businessName || "Vendor Store",
+            ownerName: vendor.ownerName || "Vendor Owner",
+            coupon: couponDetails ? {
+                code: couponDetails.code,
+                discount: couponDetails.discount,
+                discountType: couponDetails.discountType,
+                minAmoutSpend: couponDetails.minAmoutSpend,
+                expiryDate: couponDetails.expiryDate
+            } : null
+        });
+    } catch (err) {
+        return res.status(500).json({ status: 500, success: false, message: err.message });
+    }
+}
+
+async function dismissRewardPopup(req, res) {
+    try {
+        const userId = req.body.userId || (req.decoded && req.decoded.userId);
+        const email = req.decoded && req.decoded.email;
+
+        let vendor = null;
+        if (userId) {
+            vendor = await VendorModel.findOne({ userId });
+        }
+        if (!vendor && email) {
+            vendor = await VendorModel.findOne({ email });
+        }
+
+        if (vendor) {
+            vendor.rewardPopupShown = true;
+            await vendor.save();
+        }
+
+        return res.status(200).json({ status: 200, success: true, message: "Vendor reward popup dismissed" });
+    } catch (err) {
+        return res.status(500).json({ status: 500, success: false, message: err.message });
     }
 }

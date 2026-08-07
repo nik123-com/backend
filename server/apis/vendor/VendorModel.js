@@ -45,6 +45,8 @@ const VendorSchema = new mongoose.Schema({
     },
     isBlocked: { type: Boolean, default: false },
     rank: { type: Number, default: 1 },
+    rewardPopupShown: { type: Boolean, default: false },
+    latestRewardCoupon: { type: String, default: "" },
     wallet: {
         earnings: { type: Number, default: 0 },
         pendingSettlements: { type: Number, default: 0 },

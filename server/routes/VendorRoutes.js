@@ -23,6 +23,10 @@ router.use(vendorTokenChecker);
 router.post('/profile', VendorController.getVendorProfile);
 router.post('/update-profile', VendorController.updateVendorProfile);
 
+// Reward & Rank Notifier
+router.post('/checkReward', VendorController.checkRankReward);
+router.post('/dismissRewardPopup', VendorController.dismissRewardPopup);
+
 // Dashboard
 router.post('/dashboard', VendorController.getDashboardStats);
 
