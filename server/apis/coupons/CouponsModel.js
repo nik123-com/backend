@@ -7,6 +7,9 @@ const couponSchema = new mongoose.Schema({
     minAmoutSpend:{type:Number,default: 0},
     expiryDate:{type:String,default: ""},
     vendorId: {type: mongoose.Schema.Types.ObjectId, ref: 'vendor', default: null},
+    customerId: {type: mongoose.Schema.Types.ObjectId, ref: 'customer', default: null},
+    isReward: {type: Boolean, default: false},
+    rewardType: {type: String, default: ""},
     status: {type: Boolean,default:true},
 })
 

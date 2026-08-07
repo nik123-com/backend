@@ -9,6 +9,9 @@ const CustomerSchema = new mongoose.Schema({
     GovtID:{type:String, default:""},
     Address:{type:String, default:""},
     status:{type:Boolean, default:true},
+    rank:{type:Number, default:1},
+    rewardPopupShown:{type:Boolean, default:false},
+    latestRewardCoupon:{type:String, default:""},
     created_at:{type:Date, default:Date.now()}
 })
 

@@ -18,7 +18,8 @@ module.exports = {
     getAllVendors,
     approveVendor,
     rejectVendor,
-    toggleBlockVendor
+    toggleBlockVendor,
+    allotRank
 };
 
 // 1. Vendor Public Registration
@@ -401,6 +402,37 @@ async function toggleBlockVendor(req, res) {
             success: true,
             status: 200,
             message: `Vendor has been ${vendor.isBlocked ? 'blocked' : 'unblocked'}.`,
+            data: vendor
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, status: 500, message: err.message });
+    }
+}
+
+async function allotRank(req, res) {
+    try {
+        const { vendorId, rank } = req.body;
+        if (!vendorId) {
+            return res.status(400).json({ success: false, status: 400, message: "Vendor ID is required" });
+        }
+
+        const numericRank = parseInt(rank, 10);
+        if (isNaN(numericRank) || numericRank < 1) {
+            return res.status(400).json({ success: false, status: 400, message: "Rank must be a valid positive number" });
+        }
+
+        const vendor = await VendorModel.findById(vendorId);
+        if (!vendor) {
+            return res.status(404).json({ success: false, status: 404, message: "Vendor not found" });
+        }
+
+        vendor.rank = numericRank;
+        await vendor.save();
+
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            message: `Rank ${numericRank} allotted to store "${vendor.businessName || 'Vendor'}" successfully.`,
             data: vendor
         });
     } catch (err) {

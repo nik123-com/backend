@@ -40,6 +40,10 @@ router.post('/announcement/all', announcementController.getUserAnnouncements)
 
 router.use(require("../middleware/customerTokenChecker"))
 
+// Reward Routes
+router.post('/checkReward', CustomerController.checkRankReward)
+router.post('/dismissReward', CustomerController.dismissRewardPopup)
+
 // Notification Routes
 router.post('/notification/all', notificationController.getNotifications)
 router.post('/notification/respond', notificationController.respondInvite)

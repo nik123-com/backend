@@ -105,6 +105,7 @@ router.post('/customer/update', CustomerController.update)
 router.post('/customer/DeleteOne', CustomerController.DeleteOne)
 router.post('/customer/softDelete', CustomerController.softDelete)
 router.post('/customer/toggleBlock',CustomerController.toggleBlock)
+router.post('/customer/allotRank', CustomerController.allotRank)
 
 
 //Coupon
@@ -144,6 +145,7 @@ router.post('/vendor/all', VendorController.getAllVendors)
 router.post('/vendor/approve', VendorController.approveVendor)
 router.post('/vendor/reject', VendorController.rejectVendor)
 router.post('/vendor/toggleBlock', VendorController.toggleBlockVendor)
+router.post('/vendor/allotRank', VendorController.allotRank)
 
 // Announcement Management
 router.post('/announcement/add', announcementController.addAnnouncement)

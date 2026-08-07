@@ -44,6 +44,7 @@ const VendorSchema = new mongoose.Schema({
         default: 'Pending' 
     },
     isBlocked: { type: Boolean, default: false },
+    rank: { type: Number, default: 1 },
     wallet: {
         earnings: { type: Number, default: 0 },
         pendingSettlements: { type: Number, default: 0 },

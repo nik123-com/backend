@@ -1,5 +1,7 @@
 const CustomerModel = require('../customer/CustomerModel');
-const userModel = require('../user/userModel')
+const CouponModel = require('../coupons/CouponsModel');
+const NotificationModel = require('../notification/NotificationModel');
+const userModel = require('../user/userModel');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken')
 const skey = "secret"
@@ -372,6 +374,158 @@ const toggleBlock = async (req, res) => {
   }
 };
 
+const allotRank = async (req, res) => {
+  try {
+    const { customerId, rank } = req.body;
+    if (!customerId) {
+      return res.send({ status: 400, success: false, message: "Customer ID is required" });
+    }
+
+    const numericRank = parseInt(rank, 10);
+    if (isNaN(numericRank) || numericRank < 1) {
+      return res.send({ status: 400, success: false, message: "Rank must be a valid positive number" });
+    }
+
+    const customer = await CustomerModel.findById(customerId);
+    if (!customer) {
+      return res.send({ status: 404, success: false, message: "Customer not found" });
+    }
+
+    customer.rank = numericRank;
+
+    let generatedCoupon = null;
+    // Automatically generate Reward Coupon if customer is allotted Rank 1
+    if (numericRank === 1) {
+      const { discount, discountType, minAmoutSpend, expiryDate, couponCode: customCode } = req.body;
+      const randomCode = Math.floor(100 + Math.random() * 900);
+      const couponCode = customCode && customCode.trim() !== ""
+        ? customCode.trim().toUpperCase()
+        : `RANK1REWARD-${randomCode}`;
+
+      let defaultExp = new Date();
+      defaultExp.setDate(defaultExp.getDate() + 30);
+      const defaultExpStr = defaultExp.toISOString().split('T')[0];
+
+      const newCoupon = new CouponModel({
+        code: couponCode,
+        discount: discount ? String(discount) : "20",
+        discountType: discountType || "Percentage",
+        minAmoutSpend: minAmoutSpend ? Number(minAmoutSpend) : 0,
+        expiryDate: expiryDate || defaultExpStr,
+        customerId: customer._id,
+        isReward: true,
+        rewardType: "Rank 1 Special Reward",
+        status: true
+      });
+
+      await newCoupon.save();
+      customer.rewardPopupShown = false;
+      customer.latestRewardCoupon = couponCode;
+      generatedCoupon = couponCode;
+    }
+
+    await customer.save();
+
+    // Create Notification for Customer
+    if (customer.userId) {
+      try {
+        const notifMsg = numericRank === 1
+          ? `🏆 You have been allotted Rank #1! You received an exclusive Reward Coupon: '${generatedCoupon}'`
+          : `🏆 Admin has allotted Rank #${numericRank} to your customer account.`;
+
+        await NotificationModel.create({
+          senderId: req.decoded ? req.decoded.userId : null,
+          recipientId: customer.userId,
+          type: 'rank_allotment',
+          status: 'pending',
+          message: notifMsg
+        });
+      } catch (notifErr) {
+        console.error("Error creating rank notification:", notifErr);
+      }
+    }
+
+    return res.send({
+      status: 200,
+      success: true,
+      message: numericRank === 1
+        ? `Rank 1 allotted to ${customer.name || 'Customer'}! Reward coupon '${generatedCoupon}' automatically generated.`
+        : `Rank ${numericRank} allotted to ${customer.name || 'Customer'} successfully.`,
+      data: customer,
+      rewardCoupon: generatedCoupon
+    });
+  } catch (err) {
+    return res.send({ status: 500, success: false, message: err.message });
+  }
+};
+
+const checkRankReward = async (req, res) => {
+  try {
+    const userId = req.body.userId || (req.decoded && req.decoded.userId);
+    const email = req.decoded && req.decoded.email;
+
+    let customer = null;
+    if (userId) {
+      customer = await CustomerModel.findOne({ userId });
+    }
+    if (!customer && email) {
+      customer = await CustomerModel.findOne({ email });
+    }
+
+    if (!customer) {
+      return res.send({ status: 404, success: false, message: "Customer not found" });
+    }
+
+    let couponDetails = null;
+    if (customer.latestRewardCoupon) {
+      couponDetails = await CouponModel.findOne({ code: customer.latestRewardCoupon });
+    }
+    if (!couponDetails && customer.rank === 1) {
+      couponDetails = await CouponModel.findOne({ customerId: customer._id, isReward: true }).sort({ _id: -1 });
+    }
+
+    return res.send({
+      status: 200,
+      success: true,
+      rank: customer.rank || 1,
+      customerName: customer.name || "Customer",
+      coupon: couponDetails ? {
+        code: couponDetails.code,
+        discount: couponDetails.discount,
+        discountType: couponDetails.discountType,
+        minAmoutSpend: couponDetails.minAmoutSpend,
+        expiryDate: couponDetails.expiryDate
+      } : null
+    });
+  } catch (err) {
+    return res.send({ status: 500, success: false, message: err.message });
+  }
+};
+
+const dismissRewardPopup = async (req, res) => {
+  try {
+    const userId = req.body.userId || (req.decoded && req.decoded.userId);
+    const email = req.decoded && req.decoded.email;
+
+    let customer = null;
+    if (userId) {
+      customer = await CustomerModel.findOne({ userId });
+    }
+    if (!customer && email) {
+      customer = await CustomerModel.findOne({ email });
+    }
+
+    if (customer) {
+      customer.rewardPopupShown = true;
+      await customer.save();
+    }
+
+    return res.send({ status: 200, success: true, message: "Reward popup dismissed" });
+  } catch (err) {
+    return res.send({ status: 500, success: false, message: err.message });
+  }
+};
+
 module.exports = {
-  Register, all, single, update, DeleteOne, softDelete, toggleBlock
+  Register, all, single, update, DeleteOne, softDelete, toggleBlock, allotRank, checkRankReward, dismissRewardPopup
 }
