@@ -459,6 +459,49 @@ const allotRank = async (req, res) => {
   }
 };
 
+const revokeRank = async (req, res) => {
+  try {
+    const { customerId } = req.body;
+    if (!customerId) {
+      return res.send({ status: 400, success: false, message: "Customer ID is required" });
+    }
+
+    const customer = await CustomerModel.findById(customerId);
+    if (!customer) {
+      return res.send({ status: 404, success: false, message: "Customer not found" });
+    }
+
+    customer.rank = null;
+    customer.rewardPopupShown = true;
+    customer.latestRewardCoupon = "";
+    await customer.save();
+
+    // Create Notification for Customer
+    if (customer.userId) {
+      try {
+        await NotificationModel.create({
+          senderId: req.decoded ? req.decoded.userId : null,
+          recipientId: customer.userId,
+          type: 'rank_revocation',
+          status: 'pending',
+          message: `⚠️ Admin has revoked your rank status.`
+        });
+      } catch (notifErr) {
+        console.error("Error creating rank revocation notification:", notifErr);
+      }
+    }
+
+    return res.send({
+      status: 200,
+      success: true,
+      message: `Rank revoked from ${customer.name || 'Customer'} successfully.`,
+      data: customer
+    });
+  } catch (err) {
+    return res.send({ status: 500, success: false, message: err.message });
+  }
+};
+
 const checkRankReward = async (req, res) => {
   try {
     const userId = req.body.userId || (req.decoded && req.decoded.userId);
@@ -476,6 +519,10 @@ const checkRankReward = async (req, res) => {
       return res.send({ status: 404, success: false, message: "Customer not found" });
     }
 
+    if (!customer.rank || customer.rewardPopupShown) {
+      return res.send({ status: 200, success: false, message: "No active rank notification" });
+    }
+
     let couponDetails = null;
     if (customer.latestRewardCoupon) {
       couponDetails = await CouponModel.findOne({ code: customer.latestRewardCoupon });
@@ -487,7 +534,7 @@ const checkRankReward = async (req, res) => {
     return res.send({
       status: 200,
       success: true,
-      rank: customer.rank || 1,
+      rank: customer.rank,
       customerName: customer.name || "Customer",
       coupon: couponDetails ? {
         code: couponDetails.code,
@@ -527,5 +574,5 @@ const dismissRewardPopup = async (req, res) => {
 };
 
 module.exports = {
-  Register, all, single, update, DeleteOne, softDelete, toggleBlock, allotRank, checkRankReward, dismissRewardPopup
+  Register, all, single, update, DeleteOne, softDelete, toggleBlock, allotRank, revokeRank, checkRankReward, dismissRewardPopup
 }

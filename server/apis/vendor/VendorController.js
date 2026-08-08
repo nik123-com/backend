@@ -16,6 +16,7 @@ module.exports = {
     getDashboardStats,
     getWalletDetails,
     requestPayout,
+
     // Admin features
     getAllVendors,
     approveVendor,
@@ -135,10 +136,10 @@ async function updateVendorProfile(req, res) {
         const updates = req.body;
 
         if (updates.bankDetails && typeof updates.bankDetails === 'string') {
-            try { updates.bankDetails = JSON.parse(updates.bankDetails); } catch (e) {}
+            try { updates.bankDetails = JSON.parse(updates.bankDetails); } catch (e) { }
         }
         if (updates.socialLinks && typeof updates.socialLinks === 'string') {
-            try { updates.socialLinks = JSON.parse(updates.socialLinks); } catch (e) {}
+            try { updates.socialLinks = JSON.parse(updates.socialLinks); } catch (e) { }
         }
 
         const updatedVendor = await VendorModel.findByIdAndUpdate(
