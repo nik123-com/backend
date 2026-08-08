@@ -23,6 +23,7 @@ module.exports = {
     rejectVendor,
     toggleBlockVendor,
     allotRank,
+    revokeRank,
     checkRankReward,
     dismissRewardPopup
 };
@@ -502,6 +503,50 @@ async function allotRank(req, res) {
                 : `Rank ${numericRank} allotted to store "${vendor.businessName}" successfully.`,
             data: vendor,
             rewardCoupon: generatedCoupon
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, status: 500, message: err.message });
+    }
+}
+
+async function revokeRank(req, res) {
+    try {
+        const { vendorId } = req.body;
+        if (!vendorId) {
+            return res.status(400).json({ success: false, status: 400, message: "Vendor ID is required" });
+        }
+
+        const vendor = await VendorModel.findById(vendorId);
+        if (!vendor) {
+            return res.status(404).json({ success: false, status: 404, message: "Vendor not found" });
+        }
+
+        vendor.rank = null;
+        vendor.rewardPopupShown = true;
+        vendor.latestRewardCoupon = "";
+        await vendor.save();
+
+        // Create Notification for Vendor
+        if (vendor.userId) {
+            try {
+                const recipientId = vendor.userId._id || vendor.userId;
+                await NotificationModel.create({
+                    senderId: req.decoded ? req.decoded.userId : null,
+                    recipientId: recipientId,
+                    type: 'rank_revocation',
+                    status: 'pending',
+                    message: `⚠️ Admin has revoked your store rank status.`
+                });
+            } catch (notifErr) {
+                console.error("Error creating vendor rank revocation notification:", notifErr);
+            }
+        }
+
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            message: `Rank revoked from store "${vendor.businessName || 'Vendor'}" successfully.`,
+            data: vendor
         });
     } catch (err) {
         return res.status(500).json({ success: false, status: 500, message: err.message });

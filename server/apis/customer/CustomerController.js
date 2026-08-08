@@ -488,9 +488,10 @@ const revokeRank = async (req, res) => {
     // Create Notification for Customer
     if (customer.userId) {
       try {
+        const recipientId = customer.userId._id || customer.userId;
         await NotificationModel.create({
           senderId: req.decoded ? req.decoded.userId : null,
-          recipientId: customer.userId,
+          recipientId: recipientId,
           type: 'rank_revocation',
           status: 'pending',
           message: `⚠️ Admin has revoked your rank status.`
