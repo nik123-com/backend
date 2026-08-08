@@ -431,6 +431,16 @@ async function allotRank(req, res) {
             return res.status(404).json({ success: false, status: 404, message: "Vendor not found" });
         }
 
+        // Check if another vendor already has this rank (especially Rank 1)
+        const existingRankVendor = await VendorModel.findOne({ rank: numericRank, _id: { $ne: vendorId } });
+        if (existingRankVendor) {
+            const vName = existingRankVendor.businessName || existingRankVendor.ownerName || "another vendor";
+            const msg = numericRank === 1
+                ? `Rank 1 is already allotted to vendor "${vName}". Please revoke Rank 1 from "${vName}" first before allotting it to another vendor.`
+                : `Rank #${numericRank} is already allotted to vendor "${vName}". Each rank must be unique.`;
+            return res.status(400).json({ success: false, status: 400, message: msg });
+        }
+
         vendor.rank = numericRank;
         vendor.rewardPopupShown = false;
 
