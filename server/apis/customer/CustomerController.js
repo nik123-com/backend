@@ -391,6 +391,15 @@ const allotRank = async (req, res) => {
       return res.send({ status: 404, success: false, message: "Customer not found" });
     }
 
+    // Check if another customer already has this rank (especially Rank 1)
+    const existingRankCustomer = await CustomerModel.findOne({ rank: numericRank, _id: { $ne: customerId } });
+    if (existingRankCustomer) {
+      const msg = numericRank === 1
+        ? `Rank 1 is already allotted to customer "${existingRankCustomer.name}". Please revoke Rank 1 from "${existingRankCustomer.name}" first before allotting it to another customer.`
+        : `Rank #${numericRank} is already allotted to customer "${existingRankCustomer.name}". Each rank must be unique.`;
+      return res.send({ status: 400, success: false, message: msg });
+    }
+
     customer.rank = numericRank;
 
     let generatedCoupon = null;
