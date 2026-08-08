@@ -479,13 +479,20 @@ async function allotRank(req, res) {
         // Create Notification for Vendor
         if (vendor.userId) {
             try {
+                const recipientId = vendor.userId._id || vendor.userId;
+                // Delete previous rank notifications first to keep notification list clean
+                await NotificationModel.deleteMany({
+                    recipientId: recipientId,
+                    type: { $in: ['rank_allotment', 'rank_revocation'] }
+                });
+
                 const notifMsg = numericRank === 1
                     ? `🏆 Your store "${vendor.businessName}" has been allotted Rank #1! You received an exclusive Reward Coupon: '${generatedCoupon}'`
                     : `🏆 Admin has allotted Rank #${numericRank} to your store "${vendor.businessName}".`;
 
                 await NotificationModel.create({
                     senderId: req.decoded ? req.decoded.userId : null,
-                    recipientId: vendor.userId,
+                    recipientId: recipientId,
                     type: 'rank_allotment',
                     status: 'pending',
                     message: notifMsg
@@ -526,19 +533,19 @@ async function revokeRank(req, res) {
         vendor.latestRewardCoupon = "";
         await vendor.save();
 
-        // Create Notification for Vendor
+        // Delete any rank reward coupons associated with this vendor
+        await CouponModel.deleteMany({ vendorId: vendor._id, isReward: true });
+
+        // Auto-delete Rank Notifications from Vendor
         if (vendor.userId) {
             try {
                 const recipientId = vendor.userId._id || vendor.userId;
-                await NotificationModel.create({
-                    senderId: req.decoded ? req.decoded.userId : null,
+                await NotificationModel.deleteMany({
                     recipientId: recipientId,
-                    type: 'rank_revocation',
-                    status: 'pending',
-                    message: `⚠️ Admin has revoked your store rank status.`
+                    type: { $in: ['rank_allotment', 'rank_revocation'] }
                 });
             } catch (notifErr) {
-                console.error("Error creating vendor rank revocation notification:", notifErr);
+                console.error("Error autodeleting vendor rank notifications:", notifErr);
             }
         }
 

@@ -438,13 +438,20 @@ const allotRank = async (req, res) => {
     // Create Notification for Customer
     if (customer.userId) {
       try {
+        const recipientId = customer.userId._id || customer.userId;
+        // Delete previous rank notifications first to keep notification list clean
+        await NotificationModel.deleteMany({
+          recipientId: recipientId,
+          type: { $in: ['rank_allotment', 'rank_revocation'] }
+        });
+
         const notifMsg = numericRank === 1
           ? `🏆 You have been allotted Rank #1! You received an exclusive Reward Coupon: '${generatedCoupon}'`
           : `🏆 Admin has allotted Rank #${numericRank} to your customer account.`;
 
         await NotificationModel.create({
           senderId: req.decoded ? req.decoded.userId : null,
-          recipientId: customer.userId,
+          recipientId: recipientId,
           type: 'rank_allotment',
           status: 'pending',
           message: notifMsg
@@ -485,19 +492,19 @@ const revokeRank = async (req, res) => {
     customer.latestRewardCoupon = "";
     await customer.save();
 
-    // Create Notification for Customer
+    // Delete any rank reward coupons associated with this customer
+    await CouponModel.deleteMany({ customerId: customer._id, isReward: true });
+
+    // Auto-delete Rank Notifications from Customer
     if (customer.userId) {
       try {
         const recipientId = customer.userId._id || customer.userId;
-        await NotificationModel.create({
-          senderId: req.decoded ? req.decoded.userId : null,
+        await NotificationModel.deleteMany({
           recipientId: recipientId,
-          type: 'rank_revocation',
-          status: 'pending',
-          message: `⚠️ Admin has revoked your rank status.`
+          type: { $in: ['rank_allotment', 'rank_revocation'] }
         });
       } catch (notifErr) {
-        console.error("Error creating rank revocation notification:", notifErr);
+        console.error("Error autodeleting customer rank notifications:", notifErr);
       }
     }
 

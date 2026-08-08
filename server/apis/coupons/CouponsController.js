@@ -1,4 +1,7 @@
 const CouponModel = require('../coupons/CouponsModel');
+const NotificationModel = require('../notification/NotificationModel');
+const VendorModel = require('../vendor/VendorModel');
+const CustomerModel = require('../customer/CustomerModel');
 
 // Auto Hard Delete Expired Coupons
 const deleteExpiredCoupons = async () => {
@@ -70,11 +73,58 @@ const add = async (req,res) => {
         let coupon = new CouponModel();
         coupon.code = finalCode;
         coupon.discount = req.body.discount;
-        coupon.discountType = req.body.discountType;
-        coupon.minAmoutSpend = req.body.minAmoutSpend;
-        coupon.expiryDate = req.body.expiryDate;
+        coupon.discountType = req.body.discountType || "1";
+        coupon.minAmoutSpend = req.body.minAmoutSpend || 0;
+        coupon.expiryDate = req.body.expiryDate || "";
+        if (req.body.vendorId) coupon.vendorId = req.body.vendorId;
+        if (req.body.customerId) coupon.customerId = req.body.customerId;
+        if (req.body.isReward) coupon.isReward = req.body.isReward;
+        if (req.body.rewardType) coupon.rewardType = req.body.rewardType;
 
         await coupon.save();
+
+        const discText = (coupon.discountType === "2" || coupon.discountType === "Percentage")
+            ? `${coupon.discount}% OFF`
+            : `₹${coupon.discount} OFF`;
+
+        // Send notification to Vendor if granted specifically
+        if (coupon.vendorId) {
+            try {
+                const vendor = await VendorModel.findById(coupon.vendorId);
+                if (vendor && vendor.userId) {
+                    const recipientId = vendor.userId._id || vendor.userId;
+                    await NotificationModel.create({
+                        senderId: req.decoded ? req.decoded.userId : null,
+                        recipientId: recipientId,
+                        type: 'rank_allotment',
+                        status: 'pending',
+                        message: `🎟️ Admin has granted your store "${vendor.businessName || 'Vendor'}" an exclusive coupon: '${coupon.code}' (${discText})!`
+                    });
+                }
+            } catch (vNotifErr) {
+                console.error("Error creating vendor coupon notification:", vNotifErr);
+            }
+        }
+
+        // Send notification to Customer if granted specifically
+        if (coupon.customerId) {
+            try {
+                const customer = await CustomerModel.findById(coupon.customerId);
+                if (customer && customer.userId) {
+                    const recipientId = customer.userId._id || customer.userId;
+                    await NotificationModel.create({
+                        senderId: req.decoded ? req.decoded.userId : null,
+                        recipientId: recipientId,
+                        type: 'rank_allotment',
+                        status: 'pending',
+                        message: `🎟️ Admin has granted you an exclusive discount coupon: '${coupon.code}' (${discText})!`
+                    });
+                }
+            } catch (cNotifErr) {
+                console.error("Error creating customer coupon notification:", cNotifErr);
+            }
+        }
+
         res.json({
             status:201,
             success:true,
@@ -90,7 +140,10 @@ const add = async (req,res) => {
 const all = async(req,res) =>{
     try{
         await deleteExpiredCoupons();
-        const allData = await CouponModel.find({}).populate('vendorId', 'businessName ownerName email').sort({ _id: -1 });
+        const allData = await CouponModel.find({})
+            .populate('vendorId', 'businessName ownerName email')
+            .populate('customerId', 'name email')
+            .sort({ _id: -1 });
         const total = await CouponModel.countDocuments({});
         res.json({
             status:200,
@@ -171,8 +224,7 @@ const update = async(req,res)=>{
                 couponData.discountType = incomingData.discountType;          
             }
             if(incomingData.minAmoutSpend){
-            couponData.minAmoutSpend = incomingData.minAmoutSpend;
-
+                couponData.minAmoutSpend = incomingData.minAmoutSpend;
             }
             couponData.updateAt = Date.now()
             let updatedCoupon = await couponData.save();
@@ -204,11 +256,50 @@ const DeleteOne = async(req,res)=>{
                     message:"Coupon Not Found"
                 });
             }
+
+            // If coupon belongs to vendor, clear reward coupon and autodelete rank notifications
+            if (existCoupon.vendorId) {
+                const vendor = await VendorModel.findById(existCoupon.vendorId);
+                if (vendor) {
+                    if (vendor.latestRewardCoupon === existCoupon.code) {
+                        vendor.latestRewardCoupon = "";
+                        if (existCoupon.isReward) vendor.rank = null;
+                        await vendor.save();
+                    }
+                    if (vendor.userId) {
+                        const recipientId = vendor.userId._id || vendor.userId;
+                        await NotificationModel.deleteMany({
+                            recipientId: recipientId,
+                            type: { $in: ['rank_allotment', 'rank_revocation'] }
+                        });
+                    }
+                }
+            }
+
+            // If coupon belongs to customer, clear reward coupon and autodelete rank notifications
+            if (existCoupon.customerId) {
+                const customer = await CustomerModel.findById(existCoupon.customerId);
+                if (customer) {
+                    if (customer.latestRewardCoupon === existCoupon.code) {
+                        customer.latestRewardCoupon = "";
+                        if (existCoupon.isReward) customer.rank = null;
+                        await customer.save();
+                    }
+                    if (customer.userId) {
+                        const recipientId = customer.userId._id || customer.userId;
+                        await NotificationModel.deleteMany({
+                            recipientId: recipientId,
+                            type: { $in: ['rank_allotment', 'rank_revocation'] }
+                        });
+                    }
+                }
+            }
+
             await CouponModel.deleteOne({_id:req.body._id});
             return res.json({
                 status:200,
                 success:true,
-                message:"Coupon Deleted Successfully"
+                message:"Coupon Deleted & Rank Notifications Cleared Successfully"
             });
         }catch(err){
             console.log(err);
@@ -247,6 +338,28 @@ const softDelete = async (req, res) => {
 
         existCoupon.status = false;
         await existCoupon.save();
+
+        // Autodelete rank notifications when coupon is deactivated
+        if (existCoupon.vendorId) {
+            const vendor = await VendorModel.findById(existCoupon.vendorId);
+            if (vendor && vendor.userId) {
+                const recipientId = vendor.userId._id || vendor.userId;
+                await NotificationModel.deleteMany({
+                    recipientId: recipientId,
+                    type: { $in: ['rank_allotment', 'rank_revocation'] }
+                });
+            }
+        }
+        if (existCoupon.customerId) {
+            const customer = await CustomerModel.findById(existCoupon.customerId);
+            if (customer && customer.userId) {
+                const recipientId = customer.userId._id || customer.userId;
+                await NotificationModel.deleteMany({
+                    recipientId: recipientId,
+                    type: { $in: ['rank_allotment', 'rank_revocation'] }
+                });
+            }
+        }
 
         return res.status(200).json({
             success: true,
