@@ -25,7 +25,9 @@ module.exports = {
     allotRank,
     revokeRank,
     checkRankReward,
-    dismissRewardPopup
+    dismissRewardPopup,
+    getAllSettlements,
+    updateSettlementStatus
 };
 
 // 1. Vendor Public Registration
@@ -783,5 +785,106 @@ async function dismissRewardPopup(req, res) {
         return res.status(200).json({ status: 200, success: true, message: "Vendor reward popup dismissed" });
     } catch (err) {
         return res.status(500).json({ status: 500, success: false, message: err.message });
+    }
+}
+
+async function getAllSettlements(req, res) {
+    try {
+        const vendors = await VendorModel.find({ isDeleted: false });
+        let allSettlements = [];
+
+        vendors.forEach(vendor => {
+            const history = vendor.wallet?.history || [];
+            history.forEach((tx, index) => {
+                if (tx.type === 'debit') {
+                    allSettlements.push({
+                        _id: tx._id || `${vendor._id}_${index}`,
+                        txIndex: index,
+                        vendorId: vendor._id,
+                        businessName: vendor.businessName || "Vendor Store",
+                        ownerName: vendor.ownerName || "Vendor",
+                        email: vendor.email || "",
+                        phone: vendor.phone || "",
+                        bankAccountNo: vendor.bankDetails?.accountNumber || vendor.bankAccountNo || "N/A",
+                        bankIfsc: vendor.bankDetails?.ifscCode || vendor.bankIfsc || "N/A",
+                        bankName: vendor.bankDetails?.bankName || vendor.bankName || "N/A",
+                        amount: tx.amount,
+                        description: tx.description,
+                        status: tx.status || 'pending',
+                        createdAt: tx.createdAt || new Date(),
+                        remarks: tx.remarks || ""
+                    });
+                }
+            });
+        });
+
+        allSettlements.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            data: allSettlements
+        });
+    } catch (err) {
+        console.error("getAllSettlements error:", err);
+        return res.status(500).json({ success: false, status: 500, message: err.message });
+    }
+}
+
+async function updateSettlementStatus(req, res) {
+    try {
+        const { vendorId, txIndex, txId, status, remarks } = req.body;
+        if (!vendorId || !status || (!['completed', 'rejected', 'cancelled'].includes(status))) {
+            return res.status(400).json({ success: false, status: 400, message: "Valid vendorId and target status (completed/rejected) are required" });
+        }
+
+        const vendor = await VendorModel.findById(vendorId);
+        if (!vendor || !vendor.wallet || !vendor.wallet.history) {
+            return res.status(404).json({ success: false, status: 404, message: "Vendor or wallet transaction history not found" });
+        }
+
+        let targetTx = null;
+        if (typeof txIndex === 'number' && vendor.wallet.history[txIndex]) {
+            targetTx = vendor.wallet.history[txIndex];
+        } else if (txId) {
+            targetTx = vendor.wallet.history.find(tx => tx._id && tx._id.toString() === txId.toString());
+        }
+
+        if (!targetTx) {
+            return res.status(404).json({ success: false, status: 404, message: "Settlement transaction record not found" });
+        }
+
+        const oldStatus = targetTx.status;
+        targetTx.status = status;
+        if (remarks) {
+            targetTx.remarks = remarks;
+        }
+
+        let pending = 0;
+        let completed = 0;
+        vendor.wallet.history.forEach(tx => {
+            if (tx.type === 'debit') {
+                if (tx.status === 'pending') {
+                    pending += Number(tx.amount || 0);
+                } else if (tx.status === 'completed') {
+                    completed += Number(tx.amount || 0);
+                }
+            }
+        });
+
+        vendor.wallet.pendingSettlements = pending;
+        vendor.wallet.completedSettlements = completed;
+
+        await vendor.save();
+
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            message: `Settlement payout status updated from '${oldStatus}' to '${status}' successfully!`,
+            data: vendor.wallet
+        });
+    } catch (err) {
+        console.error("updateSettlementStatus error:", err);
+        return res.status(500).json({ success: false, status: 500, message: err.message });
     }
 }

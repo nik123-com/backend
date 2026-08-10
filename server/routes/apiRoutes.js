@@ -148,6 +148,8 @@ router.post('/vendor/reject', VendorController.rejectVendor)
 router.post('/vendor/toggleBlock', VendorController.toggleBlockVendor)
 router.post('/vendor/allotRank', VendorController.allotRank)
 router.post('/vendor/revokeRank', VendorController.revokeRank)
+router.post('/vendor/settlements/all', VendorController.getAllSettlements)
+router.post('/vendor/settlements/update-status', VendorController.updateSettlementStatus)
 
 // Announcement Management
 router.post('/announcement/add', announcementController.addAnnouncement)
