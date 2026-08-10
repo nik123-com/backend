@@ -177,8 +177,12 @@ async function getDashboardStats(req, res) {
         const lowStockProducts = products.filter(p => (p.stock || 0) <= 5);
 
         // Fetch orders containing products by this vendor
+        // Fetch orders containing products by this vendor
         const orders = await OrderModel.find({
-            "products.productId": { $in: productIds }
+            $or: [
+                { "products.vendorId": vendorId },
+                { "products.productId": { $in: productIds } }
+            ]
         }).populate("products.productId");
 
         let totalRevenue = 0;
@@ -196,16 +200,21 @@ async function getDashboardStats(req, res) {
             let isPending = false;
             let isCompleted = false;
 
+            const orderStatusLower = (order.orderStatus || "").toLowerCase();
+
             order.products.forEach(item => {
-                if (item.productId && item.productId.vendorId && item.productId.vendorId.toString() === vendorId.toString()) {
+                const itemVendorId = (item.vendorId || item.productId?.vendorId || "").toString();
+                if (itemVendorId === vendorId.toString()) {
                     isVendorOrder = true;
-                    const itemPrice = Number(item.price || item.productId.price || 0);
-                    const subtotal = itemPrice * item.quantity;
+                    const rawPrice = (item.price && Number(item.price) > 0) ? item.price : (item.productId?.price || 0);
+                    const itemPrice = Number(rawPrice);
+                    const subtotal = itemPrice * (item.quantity || 1);
                     vendorOrderTotal += subtotal;
 
-                    if (item.itemStatus === 'delivered' || order.orderStatus === 'delivered') {
+                    const itemStatusLower = (item.itemStatus || "").toLowerCase();
+                    if (itemStatusLower === 'delivered' || orderStatusLower === 'delivered') {
                         isCompleted = true;
-                    } else if (['pending', 'accepted', 'packed', 'shipped'].includes(item.itemStatus || order.orderStatus)) {
+                    } else if (['pending', 'accepted', 'packed', 'shipped', 'placed'].includes(itemStatusLower || orderStatusLower)) {
                         isPending = true;
                     }
                 }
@@ -213,14 +222,16 @@ async function getDashboardStats(req, res) {
 
             if (isVendorOrder) {
                 totalOrdersCount++;
-                totalRevenue += vendorOrderTotal;
-                if (isCompleted) completedOrdersCount++;
-                else if (isPending) pendingOrdersCount++;
-
-                const orderDate = new Date(order.createdAt);
-                if (orderDate.getFullYear() === currentYear) {
-                    const monthIndex = orderDate.getMonth(); // 0 to 11
-                    monthlySales[monthIndex] += vendorOrderTotal;
+                if (isCompleted) {
+                    completedOrdersCount++;
+                    totalRevenue += vendorOrderTotal;
+                    const orderDate = new Date(order.createdAt);
+                    if (orderDate.getFullYear() === currentYear) {
+                        const monthIndex = orderDate.getMonth(); // 0 to 11
+                        monthlySales[monthIndex] += vendorOrderTotal;
+                    }
+                } else if (isPending) {
+                    pendingOrdersCount++;
                 }
             }
         });
@@ -288,7 +299,10 @@ async function getWalletDetails(req, res) {
 
         // Fetch non-deleted orders containing products by this vendor
         const orders = await OrderModel.find({
-            "products.productId": { $in: productIds },
+            $or: [
+                { "products.vendorId": vendorId },
+                { "products.productId": { $in: productIds } }
+            ],
             isDeleted: false
         })
         .populate("customerId", "name email")
@@ -304,28 +318,34 @@ async function getWalletDetails(req, res) {
 
             let vendorOrderTotal = 0;
             let hasVendorProducts = false;
+            let isItemDelivered = false;
 
             order.products.forEach(item => {
-                if (
-                    item.productId && 
-                    item.productId.vendorId && 
-                    item.productId.vendorId.toString() === vendorId.toString()
-                ) {
+                const itemVendorId = (item.vendorId || item.productId?.vendorId || "").toString();
+                if (itemVendorId === vendorId.toString()) {
                     hasVendorProducts = true;
-                    const itemPrice = Number(item.price || item.productId.price || 0);
+                    const rawPrice = (item.price && Number(item.price) > 0) ? item.price : (item.productId?.price || 0);
+                    const itemPrice = Number(rawPrice);
                     vendorOrderTotal += itemPrice * (item.quantity || 1);
+
+                    const itemStatusLower = (item.itemStatus || "").toLowerCase();
+                    if (itemStatusLower === 'delivered' || orderStatusLower === 'delivered') {
+                        isItemDelivered = true;
+                    }
                 }
             });
 
             if (hasVendorProducts && vendorOrderTotal > 0) {
-                totalOrderEarnings += vendorOrderTotal;
+                if (isItemDelivered) {
+                    totalOrderEarnings += vendorOrderTotal;
+                }
                 const custName = order.customerId?.name || "Customer";
                 orderHistory.push({
                     _id: order._id,
                     amount: vendorOrderTotal,
                     type: 'credit',
                     description: `Order #${order.autoId || order._id.toString().slice(-6)} Sale (${custName})`,
-                    status: (orderStatusLower === 'delivered' || order.paymentStatus === 'Completed') ? 'completed' : 'pending',
+                    status: isItemDelivered ? 'completed' : 'pending',
                     createdAt: order.createdAt || new Date()
                 });
             }
@@ -346,8 +366,7 @@ async function getWalletDetails(req, res) {
             }
         });
 
-        const baseEarnings = Math.max(totalOrderEarnings, vendor.wallet?.earnings || 0);
-        const availableEarnings = Math.max(0, baseEarnings - pendingSettlements - completedSettlements);
+        const availableEarnings = Math.max(0, totalOrderEarnings - pendingSettlements - completedSettlements);
 
         // Combine order earnings (credits) and payout requests (debits)
         const combinedHistory = [

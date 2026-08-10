@@ -39,16 +39,20 @@ const addOrder = async (req, res) => {
     }
 
     let totalOrders = await orderModel.countDocuments()
-    let products = cartItems.map(item => ({
-      productId: item.product_id,
-      quantity: item.qty
-    }))
-
+    let products = []
     let grandTotal = 0
     for (let item of cartItems) {
       let product = await productModel.findOne({ _id: item.product_id })
       if (!product) continue
-      grandTotal += Number(product.price) * item.qty
+      const itemPrice = Number(product.price || 0)
+      grandTotal += itemPrice * item.qty
+      products.push({
+        productId: product._id,
+        quantity: item.qty,
+        vendorId: product.vendorId || null,
+        price: itemPrice,
+        itemStatus: 'pending'
+      })
     }
     let shippingCharge = 70
     grandTotal += shippingCharge
@@ -63,7 +67,8 @@ const addOrder = async (req, res) => {
     newOrder.discount = req.body.discount || 0
     newOrder.grandTotal = req.body.totalAmount || grandTotal
     newOrder.paymentMethod = req.body.paymentMethod || "COD"
-    newOrder.paymentStatus = req.body.paymentStatus || "Pending"
+    const isOnline = (newOrder.paymentMethod || "").toUpperCase() === "ONLINE"
+    newOrder.paymentStatus = req.body.paymentStatus || (isOnline ? "Paid" : "COD")
     newOrder.orderStatus = "Placed"
 
     const savedOrder = await newOrder.save()
@@ -253,6 +258,8 @@ const updateOrderStatus = async (req, res) => {
     order.orderStatus = req.body.orderStatus;
     if (req.body.paymentStatus) {
       order.paymentStatus = req.body.paymentStatus;
+    } else if ((req.body.orderStatus || "").toLowerCase() === "delivered") {
+      order.paymentStatus = "Paid";
     }
     order.updatedAt = Date.now();
 
@@ -406,6 +413,9 @@ const updateVendorOrderStatus = async (req, res) => {
     }
 
     order.orderStatus = status;
+    if ((status || "").toLowerCase() === "delivered") {
+      order.paymentStatus = "Paid";
+    }
     order.updatedAt = Date.now();
     await order.save();
 
