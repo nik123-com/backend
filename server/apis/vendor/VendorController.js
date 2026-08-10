@@ -790,7 +790,7 @@ async function dismissRewardPopup(req, res) {
 
 async function getAllSettlements(req, res) {
     try {
-        const vendors = await VendorModel.find({ isDeleted: false });
+        const vendors = await VendorModel.find({ isDeleted: { $ne: true } });
         let allSettlements = [];
 
         vendors.forEach(vendor => {
@@ -805,8 +805,8 @@ async function getAllSettlements(req, res) {
                         ownerName: vendor.ownerName || "Vendor",
                         email: vendor.email || "",
                         phone: vendor.phone || "",
-                        bankAccountNo: vendor.bankDetails?.accountNumber || vendor.bankAccountNo || "N/A",
-                        bankIfsc: vendor.bankDetails?.ifscCode || vendor.bankIfsc || "N/A",
+                        bankAccountNo: vendor.bankDetails?.accountNo || vendor.bankDetails?.accountNumber || vendor.bankAccountNo || "N/A",
+                        bankIfsc: vendor.bankDetails?.ifsc || vendor.bankDetails?.ifscCode || vendor.bankIfsc || "N/A",
                         bankName: vendor.bankDetails?.bankName || vendor.bankName || "N/A",
                         amount: tx.amount,
                         description: tx.description,

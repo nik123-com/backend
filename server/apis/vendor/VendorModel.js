@@ -19,7 +19,7 @@ const WalletHistorySchema = new mongoose.Schema({
     amount: { type: Number, required: true },
     type: { type: String, enum: ['credit', 'debit'], default: 'credit' },
     description: { type: String, default: "" },
-    status: { type: String, enum: ['pending', 'completed', 'failed'], default: 'completed' },
+    status: { type: String, enum: ['pending', 'completed', 'failed', 'rejected', 'cancelled'], default: 'completed' },
     createdAt: { type: Date, default: Date.now }
 });
 
@@ -44,6 +44,7 @@ const VendorSchema = new mongoose.Schema({
         default: 'Pending' 
     },
     isBlocked: { type: Boolean, default: false },
+    isDeleted: { type: Boolean, default: false },
     rank: { type: Number, default: 1 },
     rewardPopupShown: { type: Boolean, default: false },
     latestRewardCoupon: { type: String, default: "" },
