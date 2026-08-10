@@ -276,39 +276,171 @@ async function getDashboardStats(req, res) {
 // 5. Vendor Wallet & Settlements
 async function getWalletDetails(req, res) {
     try {
-        const vendor = await VendorModel.findById(req.vendor._id);
+        const vendorId = req.vendor._id;
+        const vendor = await VendorModel.findById(vendorId);
+        if (!vendor) {
+            return res.status(404).json({ success: false, status: 404, message: "Vendor profile not found" });
+        }
+
+        // Fetch products by this vendor
+        const products = await ProductModel.find({ vendorId: vendorId });
+        const productIds = products.map(p => p._id);
+
+        // Fetch non-deleted orders containing products by this vendor
+        const orders = await OrderModel.find({
+            "products.productId": { $in: productIds },
+            isDeleted: false
+        })
+        .populate("customerId", "name email")
+        .populate("products.productId")
+        .sort({ createdAt: -1 });
+
+        let totalOrderEarnings = 0;
+        const orderHistory = [];
+
+        orders.forEach(order => {
+            const orderStatusLower = (order.orderStatus || "").toLowerCase();
+            if (orderStatusLower === 'cancelled') return;
+
+            let vendorOrderTotal = 0;
+            let hasVendorProducts = false;
+
+            order.products.forEach(item => {
+                if (
+                    item.productId && 
+                    item.productId.vendorId && 
+                    item.productId.vendorId.toString() === vendorId.toString()
+                ) {
+                    hasVendorProducts = true;
+                    const itemPrice = Number(item.price || item.productId.price || 0);
+                    vendorOrderTotal += itemPrice * (item.quantity || 1);
+                }
+            });
+
+            if (hasVendorProducts && vendorOrderTotal > 0) {
+                totalOrderEarnings += vendorOrderTotal;
+                const custName = order.customerId?.name || "Customer";
+                orderHistory.push({
+                    _id: order._id,
+                    amount: vendorOrderTotal,
+                    type: 'credit',
+                    description: `Order #${order.autoId || order._id.toString().slice(-6)} Sale (${custName})`,
+                    status: (orderStatusLower === 'delivered' || order.paymentStatus === 'Completed') ? 'completed' : 'pending',
+                    createdAt: order.createdAt || new Date()
+                });
+            }
+        });
+
+        // Calculate payout request totals (debits) from vendor.wallet.history
+        const existingHistory = vendor.wallet?.history || [];
+        let pendingSettlements = 0;
+        let completedSettlements = 0;
+
+        existingHistory.forEach(tx => {
+            if (tx.type === 'debit') {
+                if (tx.status === 'pending') {
+                    pendingSettlements += Number(tx.amount || 0);
+                } else if (tx.status === 'completed') {
+                    completedSettlements += Number(tx.amount || 0);
+                }
+            }
+        });
+
+        const baseEarnings = Math.max(totalOrderEarnings, vendor.wallet?.earnings || 0);
+        const availableEarnings = Math.max(0, baseEarnings - pendingSettlements - completedSettlements);
+
+        // Combine order earnings (credits) and payout requests (debits)
+        const combinedHistory = [
+            ...orderHistory,
+            ...existingHistory.map(tx => (tx.toObject ? tx.toObject() : tx))
+        ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
         return res.status(200).json({
             success: true,
             status: 200,
-            data: vendor.wallet || {
-                earnings: 0,
-                pendingSettlements: 0,
-                completedSettlements: 0,
-                history: []
+            data: {
+                earnings: availableEarnings,
+                pendingSettlements: pendingSettlements,
+                completedSettlements: completedSettlements,
+                history: combinedHistory
             }
         });
     } catch (err) {
+        console.error("getWalletDetails error:", err);
         return res.status(500).json({ success: false, status: 500, message: err.message });
     }
 }
 
 async function requestPayout(req, res) {
     try {
+        const vendorId = req.vendor._id;
         const { amount, description } = req.body;
-        const vendor = await VendorModel.findById(req.vendor._id);
+        const vendor = await VendorModel.findById(vendorId);
 
-        if (!amount || amount <= 0) {
-            return res.status(400).json({ success: false, status: 400, message: "Valid amount is required" });
+        if (!vendor) {
+            return res.status(404).json({ success: false, status: 404, message: "Vendor profile not found" });
         }
 
-        if (vendor.wallet.earnings < amount) {
-            return res.status(400).json({ success: false, status: 400, message: "Insufficient earnings balance for payout." });
+        const payoutAmt = Number(amount);
+        if (!payoutAmt || payoutAmt <= 0) {
+            return res.status(400).json({ success: false, status: 400, message: "Valid withdrawal amount is required" });
         }
 
-        vendor.wallet.earnings -= amount;
-        vendor.wallet.pendingSettlements += amount;
+        // Calculate actual available earnings balance
+        const products = await ProductModel.find({ vendorId: vendorId });
+        const productIds = products.map(p => p._id);
+        const orders = await OrderModel.find({
+            "products.productId": { $in: productIds },
+            isDeleted: false
+        }).populate("products.productId");
+
+        let totalOrderEarnings = 0;
+        orders.forEach(order => {
+            if ((order.orderStatus || "").toLowerCase() === 'cancelled') return;
+            order.products.forEach(item => {
+                if (
+                    item.productId && 
+                    item.productId.vendorId && 
+                    item.productId.vendorId.toString() === vendorId.toString()
+                ) {
+                    const itemPrice = Number(item.price || item.productId.price || 0);
+                    totalOrderEarnings += itemPrice * (item.quantity || 1);
+                }
+            });
+        });
+
+        const existingHistory = vendor.wallet?.history || [];
+        let pendingSettlements = 0;
+        let completedSettlements = 0;
+
+        existingHistory.forEach(tx => {
+            if (tx.type === 'debit') {
+                if (tx.status === 'pending') {
+                    pendingSettlements += Number(tx.amount || 0);
+                } else if (tx.status === 'completed') {
+                    completedSettlements += Number(tx.amount || 0);
+                }
+            }
+        });
+
+        const baseEarnings = Math.max(totalOrderEarnings, vendor.wallet?.earnings || 0);
+        const availableEarnings = Math.max(0, baseEarnings - pendingSettlements - completedSettlements);
+
+        if (payoutAmt > availableEarnings) {
+            return res.status(400).json({
+                success: false,
+                status: 400,
+                message: `Insufficient earnings balance. Maximum available for payout: ₹${availableEarnings.toLocaleString()}`
+            });
+        }
+
+        if (!vendor.wallet) {
+            vendor.wallet = { earnings: 0, pendingSettlements: 0, completedSettlements: 0, history: [] };
+        }
+
+        vendor.wallet.pendingSettlements = pendingSettlements + payoutAmt;
         vendor.wallet.history.unshift({
-            amount: amount,
+            amount: payoutAmt,
             type: 'debit',
             description: description || 'Payout request to bank account',
             status: 'pending',
@@ -321,9 +453,15 @@ async function requestPayout(req, res) {
             success: true,
             status: 200,
             message: "Payout request submitted successfully!",
-            data: vendor.wallet
+            data: {
+                earnings: availableEarnings - payoutAmt,
+                pendingSettlements: pendingSettlements + payoutAmt,
+                completedSettlements: completedSettlements,
+                history: vendor.wallet.history
+            }
         });
     } catch (err) {
+        console.error("requestPayout error:", err);
         return res.status(500).json({ success: false, status: 500, message: err.message });
     }
 }
