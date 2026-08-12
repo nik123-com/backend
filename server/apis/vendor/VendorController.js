@@ -307,9 +307,9 @@ async function getWalletDetails(req, res) {
             ],
             isDeleted: false
         })
-        .populate("customerId", "name email")
-        .populate("products.productId")
-        .sort({ createdAt: -1 });
+            .populate("customerId", "name email")
+            .populate("products.productId")
+            .sort({ createdAt: -1 });
 
         let totalOrderEarnings = 0;
         const orderHistory = [];
@@ -420,8 +420,8 @@ async function requestPayout(req, res) {
             if ((order.orderStatus || "").toLowerCase() === 'cancelled') return;
             order.products.forEach(item => {
                 if (
-                    item.productId && 
-                    item.productId.vendorId && 
+                    item.productId &&
+                    item.productId.vendorId &&
                     item.productId.vendorId.toString() === vendorId.toString()
                 ) {
                     const itemPrice = Number(item.price || item.productId.price || 0);

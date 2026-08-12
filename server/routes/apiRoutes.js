@@ -104,7 +104,7 @@ router.post('/customer/single', CustomerController.single)
 router.post('/customer/update', CustomerController.update)
 router.post('/customer/DeleteOne', CustomerController.DeleteOne)
 router.post('/customer/softDelete', CustomerController.softDelete)
-router.post('/customer/toggleBlock',CustomerController.toggleBlock)
+router.post('/customer/toggleBlock', CustomerController.toggleBlock)
 router.post('/customer/allotRank', CustomerController.allotRank)
 router.post('/customer/revokeRank', CustomerController.revokeRank)
 
