@@ -34,13 +34,39 @@ const add = async (req, res) => {
             })
         }
         else {
-            const existingData = await ProductModel.findOne({ name: incomingData.name });
+            const nameRegex = new RegExp("^" + incomingData.name.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i");
+            const query = {
+                name: nameRegex,
+                category_id: incomingData.category_id
+            };
+            if (incomingData.brand_id) {
+                query.brand_id = incomingData.brand_id;
+            } else {
+                query.$or = [{ brand_id: null }, { brand_id: { $exists: false } }];
+            }
+
+            const existingData = await ProductModel.findOne(query);
             if (!!existingData) {
+                const qtyToAdd = Number(incomingData.stock) > 0 ? Number(incomingData.stock) : 1;
+                existingData.stock = (Number(existingData.stock) || 0) + qtyToAdd;
+                if (req.files && req.files.length > 0) {
+                    try {
+                        const urls = await Promise.all(
+                            req.files.map(async (f) => await uploadImg(f.buffer))
+                        );
+                        existingData.image = [...(existingData.image || []), ...urls];
+                    } catch (err) {
+                        console.log(err);
+                    }
+                }
+                await existingData.save();
                 return res.json({
-                    status: 400,
-                    success: false,
-                    message: "Product already exists"
-                })
+                    status: 200,
+                    success: true,
+                    message: `Product already exists. Automatically incremented quantity by ${qtyToAdd} (Total stock: ${existingData.stock}).`,
+                    data: existingData,
+                    isExisting: true
+                });
             }
 
             // // If we need Array
@@ -459,6 +485,46 @@ const vendorAdd = async (req, res) => {
                 success: false,
                 status: 400,
                 message: "Name, Price, and Category are required."
+            });
+        }
+
+        // Check if product with same Name, Brand, Category already exists for this vendor
+        const nameRegex = new RegExp("^" + name.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i");
+        const query = {
+            vendorId,
+            name: nameRegex,
+            category_id: category_id
+        };
+
+        if (brand_id) {
+            query.brand_id = brand_id;
+        } else {
+            query.$or = [{ brand_id: null }, { brand_id: { $exists: false } }];
+        }
+
+        const existingProduct = await ProductModel.findOne(query);
+
+        if (existingProduct) {
+            // Automatically increment quantity
+            const qtyToAdd = Number(stock) > 0 ? Number(stock) : 1;
+            existingProduct.stock = (Number(existingProduct.stock) || 0) + qtyToAdd;
+
+            // Handle optional new images upload if provided
+            if (req.files && req.files.length > 0) {
+                const uploadedUrls = await Promise.all(
+                    req.files.map(async (f) => await uploadImg(f.buffer))
+                );
+                existingProduct.image = [...(existingProduct.image || []), ...uploadedUrls];
+            }
+
+            await existingProduct.save();
+
+            return res.status(200).json({
+                success: true,
+                status: 200,
+                message: `Product already exists. Automatically incremented quantity by ${qtyToAdd} (Total stock: ${existingProduct.stock}).`,
+                data: existingProduct,
+                isExisting: true
             });
         }
 
