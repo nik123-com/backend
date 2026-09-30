@@ -13,6 +13,8 @@ const productController = require('../apis/product/ProductController')
 const queryController = require('../apis/query/QueryController')
 const notificationController = require('../apis/notification/NotificationController')
 const announcementController = require('../apis/announcement/AnnouncementController')
+const recommendationController = require('../apis/recommendation/RecommendationController')
+const aiController = require('../apis/aiControler/aiController')
 const multer = require('multer')
 const upload = multer({ storage: multer.memoryStorage() })
 const router = require("express").Router()
@@ -37,6 +39,21 @@ router.post('/query/feedback', queryController.submitFeedback)
 
 // Announcement Route
 router.post('/announcement/all', announcementController.getUserAnnouncements)
+
+// Explainable Recommendations & Behavior Tracking (Customer/Guest Accessible)
+router.post('/recommendations', recommendationController.getRecommendations)
+router.post('/recommendations/explain', recommendationController.getExplanation)
+router.post('/recommendations/product-detail', recommendationController.getProductDetailRecommendations)
+router.post('/behavior/event', recommendationController.trackEvent)
+router.post('/sana/contextual-query', aiController.contextualShoppingQuery)
+router.post('/cart/smart-optimization', CartController.smartOptimization)
+
+// AI Price-Supply Bargaining System
+const bargainingController = require('../apis/bargain/BargainingController')
+router.post('/bargain/start', bargainingController.start)
+router.post('/bargain/offer', bargainingController.submitOffer)
+router.post('/bargain/accept', bargainingController.accept)
+router.post('/bargain/check-deal', bargainingController.checkActiveDeal)
 
 router.use(require("../middleware/customerTokenChecker"))
 
@@ -67,6 +84,8 @@ router.post('/cart/add', CartController.add)
 router.post('/cart/DeleteOne', CartController.DeleteOne)
 router.post('/cart/increment', CartController.increment)
 router.post('/cart/decrement', CartController.decrement)
+// Protected user preference profile
+router.post('/behavior/profile', recommendationController.getUserProfile)
 //Address
 router.post('/address/add', AddressController.add);
 router.post('/address/all', AddressController.all);

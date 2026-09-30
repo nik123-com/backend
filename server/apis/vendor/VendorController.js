@@ -27,7 +27,11 @@ module.exports = {
     checkRankReward,
     dismissRewardPopup,
     getAllSettlements,
-    updateSettlementStatus
+    updateSettlementStatus,
+
+    // Predictive Stock Intelligence
+    getStockIntelligence,
+    getProductStockForecast
 };
 
 // 1. Vendor Public Registration
@@ -888,3 +892,57 @@ async function updateSettlementStatus(req, res) {
         return res.status(500).json({ success: false, status: 500, message: err.message });
     }
 }
+
+const InventoryIntelligenceService = require("./InventoryIntelligenceService");
+
+// 11. Vendor Predictive Stock-Out Intelligence
+async function getStockIntelligence(req, res) {
+    try {
+        const vendorId = req.vendor._id;
+        const result = await InventoryIntelligenceService.getVendorStockIntelligence(vendorId);
+
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            data: result
+        });
+    } catch (err) {
+        console.error("getStockIntelligence error:", err);
+        return res.status(500).json({
+            success: false,
+            status: 500,
+            message: err.message
+        });
+    }
+}
+
+async function getProductStockForecast(req, res) {
+    try {
+        const vendorId = req.vendor._id;
+        const productId = req.body?.productId || req.body?._id;
+
+        if (!productId) {
+            return res.status(400).json({
+                success: false,
+                status: 400,
+                message: "productId is required"
+            });
+        }
+
+        const forecast = await InventoryIntelligenceService.getSingleProductForecast(vendorId, productId);
+
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            data: forecast
+        });
+    } catch (err) {
+        console.error("getProductStockForecast error:", err);
+        return res.status(500).json({
+            success: false,
+            status: 500,
+            message: err.message
+        });
+    }
+}
+

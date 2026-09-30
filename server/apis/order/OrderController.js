@@ -38,19 +38,39 @@ const addOrder = async (req, res) => {
       }
     }
 
+    const NegotiationModel = require("../bargain/NegotiationModel");
     let totalOrders = await orderModel.countDocuments()
     let products = []
     let grandTotal = 0
+    const purchasedNegotiationIds = []
+
     for (let item of cartItems) {
       let product = await productModel.findOne({ _id: item.product_id })
       if (!product) continue
-      const itemPrice = Number(product.price || 0)
-      grandTotal += itemPrice * item.qty
+
+      // Check if customer has an active single-use negotiated deal on this product
+      const activeDeal = await NegotiationModel.findOne({
+        userId: req.body.userId,
+        productId: product._id,
+        status: "deal_accepted",
+        isPurchased: false,
+        expiresAt: { $gt: new Date() }
+      }).sort({ createdAt: -1 });
+
+      const effectivePrice = activeDeal?.finalAgreedPrice
+        ? Number(activeDeal.finalAgreedPrice)
+        : (Number(item.price) || Number(product.price) || 0);
+
+      if (activeDeal) {
+        purchasedNegotiationIds.push(activeDeal._id);
+      }
+
+      grandTotal += effectivePrice * item.qty
       products.push({
         productId: product._id,
         quantity: item.qty,
         vendorId: product.vendorId || null,
-        price: itemPrice,
+        price: effectivePrice,
         itemStatus: 'pending'
       })
     }
@@ -72,6 +92,20 @@ const addOrder = async (req, res) => {
     newOrder.orderStatus = "Placed"
 
     const savedOrder = await newOrder.save()
+
+    // Consume single-use negotiated deals so customer will never see it again after purchase
+    if (purchasedNegotiationIds.length > 0) {
+      await NegotiationModel.updateMany(
+        { _id: { $in: purchasedNegotiationIds } },
+        {
+          $set: {
+            isPurchased: true,
+            purchasedAt: new Date(),
+            orderId: savedOrder._id
+          }
+        }
+      );
+    }
 
     // Subtract stock for ordered products
     for (let item of cartItems) {

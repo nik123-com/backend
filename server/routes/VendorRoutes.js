@@ -41,6 +41,15 @@ router.post('/product/update', upload.array('image'), productController.vendorUp
 router.post('/product/delete', productController.vendorDelete);
 router.post('/product/update-stock', productController.vendorUpdateStock);
 
+// Predictive Stock-Out Intelligence
+router.post('/inventory/intelligence', VendorController.getStockIntelligence);
+router.post('/products/stock-forecast', VendorController.getProductStockForecast);
+
+// AI Price-Supply Bargaining History for Vendors
+const bargainingController = require('../apis/bargain/BargainingController');
+router.post('/bargain/history', bargainingController.getVendorNegotiations);
+router.post('/bargain/delete', bargainingController.deleteNegotiation);
+
 // Orders
 router.post('/order/all', OrderController.vendorOrders);
 router.post('/order/update-status', OrderController.updateVendorOrderStatus);

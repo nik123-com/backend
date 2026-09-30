@@ -1,5 +1,6 @@
 const cartModel = require('./CartModel');
 const productModel = require('../product/ProductModel');
+const NegotiationModel = require('../bargain/NegotiationModel');
 
 // CREATE OPERATION
 const add = async (req, res) => {
@@ -15,9 +16,6 @@ const add = async (req, res) => {
         }
         if (incomingData.qty === undefined || incomingData.qty === null) {
             validation.push("qty is required");
-        }
-        if (incomingData.price == undefined || incomingData.price == null) {
-            validation.push("price is required");
         }
 
         if (validation.length > 0) {
@@ -37,6 +35,23 @@ const add = async (req, res) => {
             });
         }
 
+        // Check if customer has an active unpurchased single-use negotiated deal
+        const activeDeal = await NegotiationModel.findOne({
+            userId: incomingData.user_id,
+            productId: incomingData.product_id,
+            status: "deal_accepted",
+            isPurchased: false,
+            expiresAt: { $gt: new Date() }
+        }).sort({ createdAt: -1 });
+
+        let effectivePrice = (incomingData.price !== undefined && incomingData.price !== null)
+            ? Number(incomingData.price)
+            : Number(product.price);
+
+        if (activeDeal && activeDeal.finalAgreedPrice) {
+            effectivePrice = Number(activeDeal.finalAgreedPrice);
+        }
+
         const existingData = await cartModel.findOne({
             product_id: incomingData.product_id,
             user_id: incomingData.user_id,
@@ -45,7 +60,10 @@ const add = async (req, res) => {
         const currentQty = existingData ? existingData.qty : 0;
         const addQty = Number(incomingData.qty) || 1;
 
-        if (product.stock < currentQty + addQty) {
+        // When a negotiated deal is applied, the user negotiated for addQty units
+        const targetQty = activeDeal ? addQty : (currentQty + addQty);
+
+        if (product.stock < targetQty) {
             return res.json({
                 status: 400,
                 success: false,
@@ -54,19 +72,19 @@ const add = async (req, res) => {
         }
 
         if (existingData) {
-            existingData.qty = existingData.qty + 1;
+            existingData.qty = targetQty;
+            existingData.price = effectivePrice;
             await existingData.save();
         } else {
             const savedData = new cartModel({
                 product_id: incomingData.product_id,
                 user_id: incomingData.user_id,
-                qty: incomingData.qty,
-                price: incomingData.price,
+                qty: targetQty,
+                price: effectivePrice,
             });
 
             await savedData.save();
         }
-
 
         return res.json({
             status: 201,
@@ -85,7 +103,36 @@ const add = async (req, res) => {
 // READ ALL OPERATION
 const all = async (req, res) => {
     try {
-        const allData = await cartModel.find({ status: true,  user_id: req.body.userId}).populate("product_id").populate("user_id");
+        const userId = req.body?.userId;
+        const allData = await cartModel.find({ status: true,  user_id: userId}).populate("product_id").populate("user_id");
+
+        if (userId && allData && allData.length > 0) {
+            for (let item of allData) {
+                if (item.product_id) {
+                    const prodId = item.product_id._id || item.product_id;
+                    const activeDeal = await NegotiationModel.findOne({
+                        userId: userId,
+                        productId: prodId,
+                        status: "deal_accepted",
+                        isPurchased: false,
+                        expiresAt: { $gt: new Date() }
+                    }).sort({ createdAt: -1 });
+
+                    if (activeDeal && activeDeal.finalAgreedPrice) {
+                        const dealPrice = Number(activeDeal.finalAgreedPrice);
+                        if (item.price !== dealPrice) {
+                            item.price = dealPrice;
+                            await cartModel.updateOne({ _id: item._id }, { $set: { price: dealPrice } });
+                        }
+                    } else if (item.product_id.price && item.price !== Number(item.product_id.price)) {
+                        const origPrice = Number(item.product_id.price);
+                        item.price = origPrice;
+                        await cartModel.updateOne({ _id: item._id }, { $set: { price: origPrice } });
+                    }
+                }
+            }
+        }
+
         const total = await cartModel.countDocuments({});
 
         return res.json({
@@ -391,6 +438,33 @@ const decrement = async (req, res) => {
   }
 };
 
+const SmartCartService = require('./SmartCartService');
+
+const smartOptimization = async (req, res) => {
+  try {
+    const userId = req.body?.userId || (req.decoded ? req.decoded.userId : null);
+    const currentCouponCode = req.body?.couponCode || null;
+
+    const result = await SmartCartService.optimizeCart({
+      userId,
+      currentCouponCode
+    });
+
+    return res.status(200).json({
+      status: 200,
+      success: true,
+      data: result
+    });
+  } catch (err) {
+    console.error("smartOptimization error:", err);
+    return res.status(500).json({
+      status: 500,
+      success: false,
+      message: err.message
+    });
+  }
+};
+
 module.exports = {
     add,
     all,
@@ -399,5 +473,6 @@ module.exports = {
     DeleteOne,
     softDelete,
     increment,
-    decrement
+    decrement,
+    smartOptimization
 }

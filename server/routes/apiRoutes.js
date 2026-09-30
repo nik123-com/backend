@@ -13,6 +13,7 @@ const CartController = require('../apis/cart/CartController')
 const queryController = require('../apis/query/QueryController')
 
 const aiController = require('../apis/aiControler/aiController')
+const recommendationController = require('../apis/recommendation/RecommendationController')
 // const wishlistController = require('../apis/wishList/WishListController')
 const multer = require('multer')
 
@@ -47,6 +48,14 @@ router.post("/resetPassword/:token", userController.resetPassword)
 //AI integration
 router.post("/aiCall", aiController.main)
 router.post("/ai/announcement-description", aiController.generateAnnouncementDescription)
+router.post("/sana/contextual-query", aiController.contextualShoppingQuery)
+
+// Recommendations & Behavior Tracking (Public & Customer Accessible)
+router.post("/recommendations/all", recommendationController.getRecommendations)
+router.post("/recommendations/product-detail", recommendationController.getProductDetailRecommendations)
+router.post("/recommendations/explain", recommendationController.getExplanation)
+router.post("/behavior/event", recommendationController.trackEvent)
+router.post("/recommendations/metrics", recommendationController.trackMetric)
 
 router.use(require("../middleware/AdminTokenChecker"))
 
@@ -156,5 +165,8 @@ router.post('/announcement/add', announcementController.addAnnouncement)
 router.post('/announcement/all', announcementController.getAllAnnouncements)
 router.post('/announcement/delete', announcementController.deleteAnnouncement)
 router.post('/announcement/user', announcementController.getUserAnnouncements)
+
+// Admin Analytics for Recommendations & Smart Cart
+router.post('/recommendations/analytics', recommendationController.getAnalytics)
 
 module.exports = router; 
