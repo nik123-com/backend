@@ -708,11 +708,11 @@ const updateProfile = async (req, res) => {
           message: "Current password does not match. Please verify and try again."
         });
       }
-      if (newPassword.trim().length < 6) {
+      if (!newPassword || !newPassword.trim()) {
         return res.status(400).json({
           status: 400,
           success: false,
-          message: "New password must be at least 6 characters long."
+          message: "New password is required."
         });
       }
       user.password = bcrypt.hashSync(newPassword.trim(), 10);
