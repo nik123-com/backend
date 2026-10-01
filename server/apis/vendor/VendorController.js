@@ -695,6 +695,9 @@ async function revokeRank(req, res) {
         vendor.rewardPopupShown = true;
         vendor.latestRewardCoupon = "";
         await vendor.save();
+        await VendorModel.findByIdAndUpdate(vendorId, {
+            $set: { rank: null, rewardPopupShown: true, latestRewardCoupon: "" }
+        });
 
         // Delete any rank reward coupons associated with this vendor
         await CouponModel.deleteMany({ vendorId: vendor._id, isReward: true });

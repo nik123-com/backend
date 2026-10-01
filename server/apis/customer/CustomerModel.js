@@ -9,7 +9,7 @@ const CustomerSchema = new mongoose.Schema({
     GovtID:{type:String, default:""},
     Address:{type:String, default:""},
     status:{type:Boolean, default:true},
-    rank:{type:Number, default:1},
+    rank:{type:Number, default:null},
     rewardPopupShown:{type:Boolean, default:false},
     latestRewardCoupon:{type:String, default:""},
     created_at:{type:Date, default:Date.now()}

@@ -491,6 +491,9 @@ const revokeRank = async (req, res) => {
     customer.rewardPopupShown = true;
     customer.latestRewardCoupon = "";
     await customer.save();
+    await CustomerModel.findByIdAndUpdate(customerId, {
+      $set: { rank: null, rewardPopupShown: true, latestRewardCoupon: "" }
+    });
 
     // Delete any rank reward coupons associated with this customer
     await CouponModel.deleteMany({ customerId: customer._id, isReward: true });

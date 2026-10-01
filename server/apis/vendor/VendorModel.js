@@ -45,7 +45,7 @@ const VendorSchema = new mongoose.Schema({
     },
     isBlocked: { type: Boolean, default: false },
     isDeleted: { type: Boolean, default: false },
-    rank: { type: Number, default: 1 },
+    rank: { type: Number, default: null },
     rewardPopupShown: { type: Boolean, default: false },
     latestRewardCoupon: { type: String, default: "" },
     wallet: {
