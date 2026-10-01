@@ -58,6 +58,10 @@ router.post('/bargain/session-status', bargainingController.sessionStatus)
 
 router.use(require("../middleware/customerTokenChecker"))
 
+// Customer Profile & Credentials
+router.post('/profile', CustomerController.getProfile)
+router.post('/profile/update', upload.single('evidence'), CustomerController.updateProfile)
+
 // Reward Routes
 router.post('/checkReward', CustomerController.checkRankReward)
 router.post('/dismissReward', CustomerController.dismissRewardPopup)

@@ -593,6 +593,168 @@ const dismissRewardPopup = async (req, res) => {
   }
 };
 
+const getProfile = async (req, res) => {
+  try {
+    const userId = (req.decoded && req.decoded.userId) || req.body.userId;
+    if (!userId) {
+      return res.status(401).json({ status: 401, success: false, message: "Unauthorized. Please login." });
+    }
+
+    const user = await userModel.findById(userId).select("-password");
+    if (!user) {
+      return res.status(404).json({ status: 404, success: false, message: "User account not found." });
+    }
+
+    let customer = await CustomerModel.findOne({ userId });
+    if (!customer && user.email) {
+      customer = await CustomerModel.findOne({ email: user.email });
+      if (customer && !customer.userId) {
+        customer.userId = user._id;
+        await customer.save();
+      }
+    }
+
+    return res.status(200).json({
+      status: 200,
+      success: true,
+      message: "Customer profile fetched successfully",
+      data: {
+        user,
+        customer: customer || {}
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ status: 500, success: false, message: "Server error: " + err.message });
+  }
+};
+
+const updateProfile = async (req, res) => {
+  try {
+    const userId = (req.decoded && req.decoded.userId) || req.body.userId;
+    if (!userId) {
+      return res.status(401).json({ status: 401, success: false, message: "Unauthorized. Please login." });
+    }
+
+    const { name, email, Contact, Address, GovtID, currentPassword, newPassword } = req.body;
+
+    const user = await userModel.findById(userId);
+    if (!user) {
+      return res.status(404).json({ status: 404, success: false, message: "User not found." });
+    }
+
+    let customer = await CustomerModel.findOne({ userId });
+    if (!customer && user.email) {
+      customer = await CustomerModel.findOne({ email: user.email });
+      if (customer && !customer.userId) {
+        customer.userId = user._id;
+      }
+    }
+    if (!customer) {
+      customer = new CustomerModel({
+        userId: user._id,
+        email: user.email,
+        name: user.name
+      });
+    }
+
+    // 1. If email is being updated, verify uniqueness
+    if (email && email.trim() && email.toLowerCase().trim() !== user.email.toLowerCase().trim()) {
+      const trimmedEmail = email.toLowerCase().trim();
+      const existingUser = await userModel.findOne({ email: trimmedEmail, _id: { $ne: userId } });
+      if (existingUser) {
+        return res.status(400).json({
+          status: 400,
+          success: false,
+          message: "Email is already registered with another account. Please choose a different email."
+        });
+      }
+      user.email = trimmedEmail;
+      customer.email = trimmedEmail;
+    }
+
+    // 2. Name update
+    if (name && name.trim()) {
+      user.name = name.trim();
+      customer.name = name.trim();
+    }
+
+    // 3. Customer specific details
+    if (Contact !== undefined) customer.Contact = Contact.trim();
+    if (Address !== undefined) customer.Address = Address.trim();
+    if (GovtID !== undefined) customer.GovtID = GovtID.trim();
+
+    // 4. Evidence / ID Proof upload
+    if (req.file) {
+      customer.evidence = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+    } else if (req.body.evidence && typeof req.body.evidence === "string") {
+      customer.evidence = req.body.evidence;
+    }
+
+    // 5. Password credential update
+    let passwordUpdated = false;
+    if (newPassword && newPassword.trim()) {
+      if (!currentPassword) {
+        return res.status(400).json({
+          status: 400,
+          success: false,
+          message: "Current password is required to update your password."
+        });
+      }
+      const isMatch = bcrypt.compareSync(currentPassword, user.password);
+      if (!isMatch) {
+        return res.status(400).json({
+          status: 400,
+          success: false,
+          message: "Current password does not match. Please verify and try again."
+        });
+      }
+      if (newPassword.trim().length < 6) {
+        return res.status(400).json({
+          status: 400,
+          success: false,
+          message: "New password must be at least 6 characters long."
+        });
+      }
+      user.password = bcrypt.hashSync(newPassword.trim(), 10);
+      passwordUpdated = true;
+    }
+
+    await user.save();
+    await customer.save();
+
+    // Generate fresh JWT token
+    const tokenSecret = "SecreteKey";
+    const payload = {
+      userId: user._id,
+      addedById: user._id,
+      email: user.email,
+      userType: user.usertype,
+      name: user.name
+    };
+    const newToken = jwt.sign(payload, tokenSecret);
+
+    return res.status(200).json({
+      status: 200,
+      success: true,
+      message: passwordUpdated
+        ? "Profile & password updated successfully!"
+        : "Profile credentials updated successfully!",
+      token: newToken,
+      data: {
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          usertype: user.usertype
+        },
+        customer
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ status: 500, success: false, message: "Error updating profile: " + err.message });
+  }
+};
+
 module.exports = {
-  Register, all, single, update, DeleteOne, softDelete, toggleBlock, allotRank, revokeRank, checkRankReward, dismissRewardPopup
+  Register, all, single, update, DeleteOne, softDelete, toggleBlock, allotRank, revokeRank, checkRankReward, dismissRewardPopup, getProfile, updateProfile
 }
