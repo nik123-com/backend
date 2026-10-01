@@ -274,6 +274,95 @@ const deleteNegotiation = async (req, res) => {
   }
 };
 
+const vendorAuthorize = async (req, res) => {
+  try {
+    const vendorId = req.vendor?._id;
+    const { negotiationId, marginPercent, maxDiscountPercent, vendorNote } = req.body;
+
+    if (!vendorId) {
+      return res.status(401).json({ success: false, status: 401, message: "Vendor authentication required" });
+    }
+    if (!negotiationId) {
+      return res.status(400).json({ success: false, status: 400, message: "negotiationId is required" });
+    }
+
+    const session = await BargainingService.vendorAuthorizeBargainSession({
+      negotiationId,
+      vendorId,
+      marginPercent,
+      maxDiscountPercent,
+      vendorNote
+    });
+
+    // Real-time broadcast if socket available
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("bargain_updated", { sessionId: session._id, status: session.status });
+    }
+
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      message: `Bargaining authorized with ${maxDiscountPercent}% max discount.`,
+      data: session
+    });
+  } catch (err) {
+    console.error("vendorAuthorize error:", err);
+    return res.status(500).json({ success: false, status: 500, message: err.message });
+  }
+};
+
+const vendorDecline = async (req, res) => {
+  try {
+    const vendorId = req.vendor?._id;
+    const { negotiationId, reason } = req.body;
+
+    if (!vendorId) {
+      return res.status(401).json({ success: false, status: 401, message: "Vendor authentication required" });
+    }
+    if (!negotiationId) {
+      return res.status(400).json({ success: false, status: 400, message: "negotiationId is required" });
+    }
+
+    const session = await BargainingService.vendorDeclineBargainSession({
+      negotiationId,
+      vendorId,
+      reason
+    });
+
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("bargain_updated", { sessionId: session._id, status: session.status });
+    }
+
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      message: "Bargaining request declined",
+      data: session
+    });
+  } catch (err) {
+    console.error("vendorDecline error:", err);
+    return res.status(500).json({ success: false, status: 500, message: err.message });
+  }
+};
+
+const sessionStatus = async (req, res) => {
+  try {
+    const userId = req.body?.userId || (req.decoded ? req.decoded.userId : null);
+    const { sessionId } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({ success: false, status: 400, message: "sessionId is required" });
+    }
+
+    const session = await BargainingService.getSessionStatus({ sessionId, userId });
+    return res.status(200).json({ success: true, status: 200, data: session });
+  } catch (err) {
+    return res.status(500).json({ success: false, status: 500, message: err.message });
+  }
+};
+
 module.exports = {
   start,
   submitOffer,
@@ -281,5 +370,8 @@ module.exports = {
   getVendorNegotiations,
   checkActiveDeal,
   getAllNegotiationsForAdmin,
-  deleteNegotiation
+  deleteNegotiation,
+  vendorAuthorize,
+  vendorDecline,
+  sessionStatus
 };

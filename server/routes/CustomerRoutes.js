@@ -54,6 +54,7 @@ router.post('/bargain/start', bargainingController.start)
 router.post('/bargain/offer', bargainingController.submitOffer)
 router.post('/bargain/accept', bargainingController.accept)
 router.post('/bargain/check-deal', bargainingController.checkActiveDeal)
+router.post('/bargain/session-status', bargainingController.sessionStatus)
 
 router.use(require("../middleware/customerTokenChecker"))
 

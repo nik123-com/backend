@@ -23,14 +23,20 @@ const NegotiationSchema = new mongoose.Schema({
   floorPrice: { type: Number, required: true }, // Internal minimum acceptable price
   targetDiscountPercent: { type: Number, default: 0 },
 
+  // Vendor Defined Margin & Maximum Discount Constraints
+  vendorMarginPercent: { type: Number, default: null }, // Margin provided by vendor (%)
+  vendorMaxDiscountPercent: { type: Number, default: null }, // Maximum discount vendor allows (%)
+  isVendorApproved: { type: Boolean, default: false },
+  vendorNote: { type: String, default: "" },
+
   // Negotiation State
   customerLatestOffer: { type: Number, default: 0 },
   aiLatestCounterOffer: { type: Number, default: 0 },
   finalAgreedPrice: { type: Number, default: null },
   status: {
     type: String,
-    enum: ["in_progress", "deal_accepted", "deal_rejected", "expired"],
-    default: "in_progress"
+    enum: ["waiting_vendor_approval", "in_progress", "deal_accepted", "deal_rejected", "expired", "vendor_declined"],
+    default: "waiting_vendor_approval"
   },
   currentRound: { type: Number, default: 1 },
   maxRounds: { type: Number, default: 3 },

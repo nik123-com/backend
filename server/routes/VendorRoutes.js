@@ -48,6 +48,8 @@ router.post('/products/stock-forecast', VendorController.getProductStockForecast
 // AI Price-Supply Bargaining History for Vendors
 const bargainingController = require('../apis/bargain/BargainingController');
 router.post('/bargain/history', bargainingController.getVendorNegotiations);
+router.post('/bargain/authorize', bargainingController.vendorAuthorize);
+router.post('/bargain/decline', bargainingController.vendorDecline);
 router.post('/bargain/delete', bargainingController.deleteNegotiation);
 
 // Orders
