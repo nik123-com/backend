@@ -743,6 +743,10 @@ async function checkRankReward(req, res) {
             return res.status(404).json({ status: 404, success: false, message: "Vendor not found" });
         }
 
+        if (!vendor.rank || vendor.rewardPopupShown) {
+            return res.status(200).json({ status: 200, success: false, message: "No active rank notification" });
+        }
+
         let couponDetails = null;
         if (vendor.latestRewardCoupon) {
             couponDetails = await CouponModel.findOne({ code: vendor.latestRewardCoupon });
@@ -754,8 +758,8 @@ async function checkRankReward(req, res) {
         return res.status(200).json({
             status: 200,
             success: true,
-            rewardPopupShown: false,
-            rank: vendor.rank || 1,
+            rewardPopupShown: vendor.rewardPopupShown,
+            rank: vendor.rank,
             businessName: vendor.businessName || "Vendor Store",
             ownerName: vendor.ownerName || "Vendor Owner",
             coupon: couponDetails ? {
