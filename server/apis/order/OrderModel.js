@@ -20,6 +20,14 @@ const orderSchema = new mongoose.Schema({
     paymentMethod: { type: String, default: "Online" },
     paymentStatus: { type: String, default: "" },
     orderStatus: { type: String, default: "pending" },
+    statusTimeline: [
+        {
+            status: { type: String, default: "" },
+            title: { type: String, default: "" },
+            timestamp: { type: Date, default: Date.now },
+            message: { type: String, default: "" }
+        }
+    ],
     createdAt: { type: Date, default: Date.now() },
     updatedAt: { type: Date, default: null },
     isDeleted: { type: Boolean, default: false },

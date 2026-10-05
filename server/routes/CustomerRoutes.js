@@ -94,6 +94,7 @@ router.post('/behavior/profile', recommendationController.getUserProfile)
 //Address
 router.post('/address/add', AddressController.add);
 router.post('/address/all', AddressController.all);
+router.post('/address/update', AddressController.update);
 router.post('/coupon/all', CouponController.all)
 
 

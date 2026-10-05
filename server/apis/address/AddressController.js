@@ -4,13 +4,20 @@ const AddressModel = require("./AddressModel")
 const add = async (req,res) => {
     try{
         const incomingData = req.body || {};
-        const existingData = await AddressModel.findOne({houseno: incomingData.houseno});
-        if(existingData){
-            return res.json({
-                status:400,
-                success:false,
-                message:"House No Already Exists"
-            })
+        if (incomingData.houseno && incomingData.pin && incomingData.editbyid) {
+            const existingData = await AddressModel.findOne({
+                houseno: incomingData.houseno,
+                pin: incomingData.pin,
+                editbyid: incomingData.editbyid
+            });
+            if(existingData){
+                return res.json({
+                    status:200,
+                    success:true,
+                    message:"Address already exists",
+                    data: existingData
+                });
+            }
         }
         let address = new AddressModel();
         address.houseno = req.body.houseno;
@@ -119,39 +126,34 @@ const update = async(req,res)=>{
 
         const addressData = await AddressModel.findOne({_id:address_id})
         if(!addressData){
-            res.json({
-            status:404,
-            success: false,
-            message: "Coupon Not Found"
+            return res.json({
+                status:404,
+                success: false,
+                message: "Address Not Found"
             })
         }else{
-            if(incomingData.houseno){
-                addressData.houseno = incomingData.houseno;
-            }
-            if(incomingData.city){
-                addressData.city = incomingData.city;
-            }
-            if(incomingData.district){
-                addressData.district = incomingData.district;          
-            }
-            if(incomingData.state){
-            addressData.state = incomingData.state;
-            }
-            if(incomingData.country){
-            addressData.country = incomingData.country;
-            }
-            if(incomingData.pin){
-            addressData.pin = incomingData.pin;
-            }
-            if(incomingData.landmark){
-            addressData.landmark = incomingData.landmark;
-            }
+            if(incomingData.houseno) addressData.houseno = incomingData.houseno;
+            if(incomingData.city) addressData.city = incomingData.city;
+            if(incomingData.district) addressData.district = incomingData.district;          
+            if(incomingData.state) addressData.state = incomingData.state;
+            if(incomingData.country) addressData.country = incomingData.country;
+            if(incomingData.pin) addressData.pin = incomingData.pin;
+            if(incomingData.landmark) addressData.landmark = incomingData.landmark;
+            if(incomingData.contact) addressData.contact = incomingData.contact;
+            if(incomingData.altercontact) addressData.altercontact = incomingData.altercontact;
             addressData.updateAt = Date.now()
             let updatedaddress = await addressData.save();
+            return res.json({
+                status: 200,
+                success: true,
+                message: "Address Updated Successfully",
+                data: updatedaddress
+            });
         }
 
     }catch(err){
-        console.log(err)
+        console.log(err);
+        return res.json({ status: 500, success: false, message: err.message });
     }
 }
 //Hard Delete

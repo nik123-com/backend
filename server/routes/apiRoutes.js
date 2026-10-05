@@ -135,6 +135,7 @@ router.post('/order/update', OrderController.updateOrderStatus)
 //Address
 router.post('/address/add', AddressController.add);
 router.post('/address/all', AddressController.all);
+router.post('/address/update', AddressController.update);
 
 //Query
 router.post('/query/all', queryController.getAllQueries);

@@ -13,6 +13,33 @@ const addOrder = async (req, res) => {
       return res.send({ status: 400, success: false, message: "Delivery address is required" })
     }
 
+    const AddressModel = require("../address/AddressModel");
+    let addressRecord = await AddressModel.findById(req.body.shipingAddress);
+    if (!addressRecord) {
+      return res.send({ status: 400, success: false, message: "Selected delivery address was not found" });
+    }
+
+    if (req.body.pin && (!addressRecord.pin || addressRecord.pin === "N/A" || addressRecord.pin.trim() === "")) {
+      addressRecord.pin = req.body.pin.trim();
+      await addressRecord.save();
+    }
+
+    if (!addressRecord.pin || addressRecord.pin === "N/A" || addressRecord.pin.trim() === "") {
+      return res.send({
+        status: 400,
+        success: false,
+        message: "Delivery PIN code is required. Please provide your 6-digit delivery PIN code."
+      });
+    }
+
+    if (!addressRecord.houseno || addressRecord.houseno.trim() === "") {
+      return res.send({
+        status: 400,
+        success: false,
+        message: "Delivery address (House/Street) is required to place your order."
+      });
+    }
+
     let customer = await customerModel.findOne({ userId: req.body.userId })
     if (!customer) {
       return res.send({ status: 404, success: false, message: "Customer profile not found" })
@@ -90,6 +117,17 @@ const addOrder = async (req, res) => {
     const isOnline = (newOrder.paymentMethod || "").toUpperCase() === "ONLINE"
     newOrder.paymentStatus = req.body.paymentStatus || (isOnline ? "Paid" : "COD")
     newOrder.orderStatus = "Placed"
+    const orderPlacedTime = new Date()
+    newOrder.createdAt = orderPlacedTime
+    newOrder.updatedAt = orderPlacedTime
+    newOrder.statusTimeline = [
+      {
+        status: "Placed",
+        title: "Order placed & payment verified",
+        timestamp: orderPlacedTime,
+        message: "Order placed & payment verified successfully"
+      }
+    ]
 
     const savedOrder = await newOrder.save()
 
@@ -295,7 +333,27 @@ const updateOrderStatus = async (req, res) => {
     } else if ((req.body.orderStatus || "").toLowerCase() === "delivered") {
       order.paymentStatus = "Paid";
     }
-    order.updatedAt = Date.now();
+    const updateTime = new Date();
+    order.updatedAt = updateTime;
+
+    if (!order.statusTimeline) {
+      order.statusTimeline = [];
+    }
+    const statusTitles = {
+      placed: "Order placed & payment verified",
+      accepted: "Order accepted by seller & inventory allocated",
+      packed: "Package packed and sealed at fulfillment warehouse",
+      shipped: "Out for delivery with courier driver",
+      delivered: "Package delivered to customer",
+      cancelled: "Order cancelled"
+    };
+    const sLower = (req.body.orderStatus || "").toLowerCase();
+    order.statusTimeline.push({
+      status: req.body.orderStatus,
+      title: statusTitles[sLower] || `Order ${req.body.orderStatus}`,
+      timestamp: updateTime,
+      message: `Status updated to ${req.body.orderStatus}`
+    });
 
     await order.save();
 
@@ -450,7 +508,28 @@ const updateVendorOrderStatus = async (req, res) => {
     if ((status || "").toLowerCase() === "delivered") {
       order.paymentStatus = "Paid";
     }
-    order.updatedAt = Date.now();
+    const updateTime = new Date();
+    order.updatedAt = updateTime;
+
+    if (!order.statusTimeline) {
+      order.statusTimeline = [];
+    }
+    const statusTitles = {
+      placed: "Order placed & payment verified",
+      accepted: "Order accepted by seller & inventory allocated",
+      packed: "Package packed and sealed at fulfillment warehouse",
+      shipped: "Out for delivery with courier driver",
+      delivered: "Package delivered to customer",
+      cancelled: "Order cancelled"
+    };
+    const sLower = (status || "").toLowerCase();
+    order.statusTimeline.push({
+      status: status,
+      title: statusTitles[sLower] || `Order ${status}`,
+      timestamp: updateTime,
+      message: `Status updated to ${status}`
+    });
+
     await order.save();
 
     return res.status(200).json({
