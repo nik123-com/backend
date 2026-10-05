@@ -432,7 +432,7 @@ Customer Profile Context:
       : "No in-stock matching products found in store inventory.";
 
     const prompt = `
-You are Sana, the intelligent, explainable, context-aware AI shopping assistant for Aventra e-commerce.
+You are Stellar, the intelligent, explainable, context-aware AI shopping assistant for Aventra e-commerce.
 
 ${userContextStr}
 

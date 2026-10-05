@@ -11,7 +11,7 @@ const RecommendationMetricsSchema = new mongoose.Schema({
       "product_detail_similar",
       "cart_cross_sell",
       "smart_cart_coupon",
-      "sana_ai_agent"
+      "Stellar_ai_agent"
     ],
     default: "for_you"
   },

@@ -45,7 +45,7 @@ router.post('/recommendations', recommendationController.getRecommendations)
 router.post('/recommendations/explain', recommendationController.getExplanation)
 router.post('/recommendations/product-detail', recommendationController.getProductDetailRecommendations)
 router.post('/behavior/event', recommendationController.trackEvent)
-router.post('/sana/contextual-query', aiController.contextualShoppingQuery)
+router.post('/Stellar/contextual-query', aiController.contextualShoppingQuery)
 router.post('/cart/smart-optimization', CartController.smartOptimization)
 
 // AI Price-Supply Bargaining System
