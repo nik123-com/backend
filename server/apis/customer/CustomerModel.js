@@ -5,6 +5,7 @@ const CustomerSchema = new mongoose.Schema({
     email:{type:String, default:""},
     userId:{type:mongoose.Schema.Types.ObjectId, ref:"user"},
     Contact:{type:String, default:""},
+    countryCode:{type:String, default:"+91"},
     evidence:{type:String, default:""},
     GovtID:{type:String, default:""},
     Address:{type:String, default:""},

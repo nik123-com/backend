@@ -16,6 +16,15 @@ const Register = (req, res) => {
   }
   if (!req.body.Contact) {
     errMsg.push("Contact is Required");
+  } else {
+    const rawContact = String(req.body.Contact).trim();
+    const parts = rawContact.split(/[- ]+/);
+    const phoneDigits = (parts.length > 1 ? parts.slice(1).join('') : rawContact).replace(/\D/g, '');
+    if (phoneDigits.length > 10) {
+      errMsg.push("Contact number should not exceed 10 digits");
+    } else if (phoneDigits.length < 10) {
+      errMsg.push("Contact number must be exactly 10 digits");
+    }
   }
   if (!req.body.Address) {
     errMsg.push("Address is Required");
@@ -61,6 +70,11 @@ const Register = (req, res) => {
           customerobj.email = req.body.email;
           customerobj.userId = userData._id;
           customerobj.Contact = req.body.Contact;
+          if (req.body.countryCode) {
+            customerobj.countryCode = req.body.countryCode;
+          } else if (req.body.Contact && req.body.Contact.includes('-')) {
+            customerobj.countryCode = req.body.Contact.split('-')[0];
+          }
           customerobj.Address = req.body.Address;
           customerobj.evidence = req.body.evidence;
           customerobj.GovtID = req.body.GovtID;
@@ -226,7 +240,22 @@ const update = async (req, res) => {
         customerData.email = incomingData.email;
       }
       if (incomingData.Contact) {
-        customerData.Contact = incomingData.Contact;
+        const trimmedContact = String(incomingData.Contact).trim();
+        const parts = trimmedContact.split(/[- ]+/);
+        const phoneDigits = (parts.length > 1 ? parts.slice(1).join('') : trimmedContact).replace(/\D/g, '');
+        if (phoneDigits.length > 10) {
+          return res.json({
+            status: 400,
+            success: false,
+            message: "Contact number should not exceed 10 digits"
+          });
+        }
+        customerData.Contact = trimmedContact;
+        if (incomingData.countryCode) {
+          customerData.countryCode = incomingData.countryCode;
+        } else if (parts.length > 1) {
+          customerData.countryCode = parts[0];
+        }
       }
       if (incomingData.Address) {
         customerData.Address = incomingData.Address;
@@ -679,7 +708,35 @@ const updateProfile = async (req, res) => {
     }
 
     // 3. Customer specific details
-    if (Contact !== undefined) customer.Contact = Contact.trim();
+    if (Contact !== undefined && Contact !== null) {
+      const trimmedContact = String(Contact).trim();
+      if (trimmedContact) {
+        const parts = trimmedContact.split(/[- ]+/);
+        const phoneDigits = (parts.length > 1 ? parts.slice(1).join('') : trimmedContact).replace(/\D/g, '');
+        if (phoneDigits.length > 10) {
+          return res.status(400).json({
+            status: 400,
+            success: false,
+            message: "Contact number should not exceed 10 digits."
+          });
+        }
+        if (phoneDigits.length < 10) {
+          return res.status(400).json({
+            status: 400,
+            success: false,
+            message: "Contact number must be exactly 10 digits."
+          });
+        }
+        customer.Contact = trimmedContact;
+        if (req.body.countryCode) {
+          customer.countryCode = req.body.countryCode;
+        } else if (parts.length > 1) {
+          customer.countryCode = parts[0];
+        }
+      } else {
+        customer.Contact = "";
+      }
+    }
     if (Address !== undefined) customer.Address = Address.trim();
     if (GovtID !== undefined) customer.GovtID = GovtID.trim();
 
