@@ -483,6 +483,14 @@ const updateVendorOrderStatus = async (req, res) => {
       return res.status(404).json({ success: false, status: 404, message: "Order not found" });
     }
 
+    if ((order.orderStatus || "").toLowerCase() === "cancelled") {
+      return res.status(400).json({
+        success: false,
+        status: 400,
+        message: "This order has already been cancelled by the customer and cannot be updated."
+      });
+    }
+
     let itemUpdated = false;
     for (let item of order.products) {
       if (item.productId && item.productId.vendorId && item.productId.vendorId.toString() === vendorId.toString()) {
@@ -540,6 +548,162 @@ const updateVendorOrderStatus = async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({ success: false, status: 500, message: err.message });
+  }
+};
+
+const customerCancelOrder = async (req, res) => {
+  try {
+    const orderId = req.body.orderId || req.body._id;
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        status: 400,
+        message: "Order ID is required"
+      });
+    }
+
+    const userId = req.decoded?.userId || req.body.userId;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        status: 401,
+        message: "User ID is required"
+      });
+    }
+
+    const customer = await customerModel.findOne({ userId });
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        status: 404,
+        message: "Customer profile not found"
+      });
+    }
+
+    const order = await orderModel.findOne({
+      _id: orderId,
+      customerId: customer._id,
+      isDeleted: false
+    }).populate("products.productId");
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        status: 404,
+        message: "Order not found or you are not authorized to cancel this order"
+      });
+    }
+
+    const currentOrderStatus = (order.orderStatus || "").toLowerCase();
+
+    if (currentOrderStatus === "cancelled") {
+      return res.status(400).json({
+        success: false,
+        status: 400,
+        message: "This order is already cancelled"
+      });
+    }
+
+    // Critical Rule: Customer can ONLY cancel before the vendor accepts the order
+    const uncancelableStatuses = ["accepted", "packed", "shipped", "delivered"];
+    const isOrderAccepted = uncancelableStatuses.includes(currentOrderStatus);
+    const hasAcceptedItem = order.products?.some(item =>
+      uncancelableStatuses.includes((item.itemStatus || "").toLowerCase())
+    );
+
+    if (isOrderAccepted || hasAcceptedItem) {
+      return res.status(400).json({
+        success: false,
+        status: 400,
+        message: "Order cannot be cancelled because the seller has already accepted or processed it."
+      });
+    }
+
+    // Restore stock for all products in this order
+    for (let item of order.products) {
+      item.itemStatus = "cancelled";
+      if (item.productId) {
+        const prodId = item.productId._id || item.productId;
+        await productModel.findByIdAndUpdate(prodId, {
+          $inc: { stock: item.quantity }
+        });
+      }
+    }
+
+    order.orderStatus = "cancelled";
+    if ((order.paymentMethod || "").toUpperCase() === "ONLINE") {
+      order.paymentStatus = "Refund Pending";
+    } else {
+      order.paymentStatus = "Cancelled";
+    }
+
+    const cancelTime = new Date();
+    order.updatedAt = cancelTime;
+
+    if (!order.statusTimeline) {
+      order.statusTimeline = [];
+    }
+    const cancelReason = req.body.reason?.trim()
+      ? `Cancelled by customer: ${req.body.reason.trim()}`
+      : "Cancelled by customer before seller acceptance";
+
+    order.statusTimeline.push({
+      status: "cancelled",
+      title: "Order cancelled by customer",
+      timestamp: cancelTime,
+      message: cancelReason
+    });
+
+    await order.save();
+
+    // Send email notification if SMTP is configured
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+      try {
+        const transporter = nodemailer.createTransport({
+          service: "Gmail",
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+          },
+        });
+        transporter.sendMail({
+          from: '"PrimeNest" <manviv1253@gmail.com>',
+          to: `${customer.email}`,
+          subject: `Order #${order.autoId || order._id} Cancelled`,
+          html: `
+            <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+              <h2 style="color: #dc3545;">Order Cancelled Successfully</h2>
+              <p>Hi <b>${customer.name || "Customer"}</b>,</p>
+              <p>Your order <b>#${order.autoId || order._id}</b> has been cancelled as requested before vendor acceptance.</p>
+              <p><b>Order Details:</b></p>
+              <ul>
+                <li><b>Order Total:</b> ₹${order.grandTotal}</li>
+                <li><b>Payment Method:</b> ${order.paymentMethod}</li>
+                <li><b>Payment Status:</b> ${order.paymentStatus}</li>
+                ${req.body.reason ? `<li><b>Reason:</b> ${req.body.reason}</li>` : ""}
+              </ul>
+              <p>Thank you for shopping with PrimeNest.</p>
+            </div>`
+        }).catch(err => console.error("Cancel email send error:", err));
+      } catch (mailErr) {
+        console.error("Transporter error:", mailErr);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      message: "Order cancelled successfully",
+      data: order
+    });
+
+  } catch (err) {
+    console.error("customerCancelOrder error:", err);
+    return res.status(500).json({
+      success: false,
+      status: 500,
+      message: err.message || "Internal server error"
+    });
   }
 };
 
@@ -608,5 +772,5 @@ const vendorInvoice = async (req, res) => {
 
 module.exports = {
   addOrder, getOrders, countOrders, allOrders, updateOrderStatus, singleOrder,
-  vendorOrders, updateVendorOrderStatus, vendorInvoice
+  vendorOrders, updateVendorOrderStatus, vendorInvoice, customerCancelOrder
 }

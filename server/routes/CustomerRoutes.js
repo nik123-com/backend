@@ -108,6 +108,17 @@ router.post('/review/softDelete', reviewController.softDelete)
 router.post('/order/add', OrderController.addOrder)
 router.post('/order/all', OrderController.getOrders)
 router.post('/order/single', OrderController.singleOrder)
-router.post('/order/update', OrderController.updateOrderStatus)
+router.post('/order/cancel', OrderController.customerCancelOrder)
+router.post('/order/update', (req, res, next) => {
+  // If customer is requesting cancellation, delegate to customerCancelOrder which verifies vendor acceptance
+  if ((req.body.orderStatus || "").toLowerCase() === "cancelled") {
+    return OrderController.customerCancelOrder(req, res);
+  }
+  return res.status(403).json({
+    success: false,
+    status: 403,
+    message: "Customers can only cancel unaccepted orders. Other status updates are restricted."
+  });
+})
 
 module.exports = router;
