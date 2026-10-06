@@ -73,6 +73,7 @@ router.post('/query/feedback', queryController.submitFeedback);
 
 // AI Assistant
 router.post('/ai/description', aiController.generateProductDescription);
+router.post('/ai/store-description', aiController.generateStoreDescription);
 router.post('/ai/seo', aiController.generateSeoData);
 router.post('/ai/caption', aiController.generateMarketingCaption);
 router.post('/ai/price-suggest', aiController.suggestPrice);

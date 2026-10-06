@@ -1,3 +1,5 @@
+const path = require("path");
+const fs = require("fs");
 const { GoogleGenAI } = require("@google/genai");
 const ProductModel = require("../product/ProductModel");
 const VendorModel = require("../vendor/VendorModel");
@@ -5,8 +7,36 @@ const CustomerModel = require("../customer/CustomerModel");
 const CouponModel = require("../coupons/CouponsModel");
 const NegotiationModel = require("./NegotiationModel");
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+function getApiKey() {
+  let key = (process.env.GEMINI_API_KEY || "").trim();
+  if (!key) {
+    const envPath = path.resolve(__dirname, "../../../.env");
+    if (fs.existsSync(envPath)) {
+      try {
+        const envContent = fs.readFileSync(envPath, "utf-8");
+        const match = envContent.match(/^\s*GEMINI_API_KEY\s*=\s*(.+)$/m);
+        if (match && match[1]) {
+          key = match[1].trim().replace(/^['"]|['"]$/g, '');
+          process.env.GEMINI_API_KEY = key;
+        }
+      } catch (e) {
+        console.error("Error reading backend .env file:", e.message);
+      }
+    }
+  }
+  return (key || "").trim();
+}
+
+function getAiClient() {
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
+  try {
+    return new GoogleGenAI({ apiKey });
+  } catch (err) {
+    console.error("Failed to initialize GoogleGenAI in BargainingService:", err.message);
+    return null;
+  }
+}
 
 /**
  * Calculates floor price and allowed discount percentage based on Price & Supply dynamics
@@ -270,14 +300,20 @@ Rules for Response:
 `;
 
   let aiText = "";
-  try {
-    const res = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt
-    });
-    aiText = res.text ? res.text.trim() : "";
-  } catch (aiErr) {
-    console.error("Gemini bargaining error:", aiErr);
+  const ai = getAiClient();
+  if (ai) {
+    try {
+      const res = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt
+      });
+      aiText = res.text ? res.text.trim() : "";
+    } catch (aiErr) {
+      console.error("Gemini bargaining error:", aiErr);
+    }
+  }
+
+  if (!aiText) {
     if (decision === "ACCEPT") {
       aiText = `Deal struck! We accept your offer of ₹${offer} per unit. Enjoy your savings!`;
     } else {

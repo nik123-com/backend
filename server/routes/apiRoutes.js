@@ -47,6 +47,9 @@ router.post("/resetPassword/:token", userController.resetPassword)
 
 //AI integration
 router.post("/aiCall", aiController.main)
+router.post("/ai/product-description", aiController.generateProductDescription)
+router.post("/ai/category-description", aiController.generateCategoryDescription)
+router.post("/ai/store-description", aiController.generateStoreDescription)
 router.post("/ai/announcement-description", aiController.generateAnnouncementDescription)
 router.post("/Stellar/contextual-query", aiController.contextualShoppingQuery)
 
