@@ -8,6 +8,8 @@ const userSchema = new mongoose.Schema({
     isBlocked: {type: Boolean, default: false},
     resetPasswordToken: {type: String},
     resetPasswordExpires: {type: Date},
+    otp: {type: String},
+    otpExpires: {type: Date},
     createdAt: {type: Date, default: Date.now()}
 })
 

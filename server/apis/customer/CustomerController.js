@@ -5,7 +5,7 @@ const userModel = require('../user/userModel');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken')
 const skey = "secret"
-const nodemailer = require("nodemailer");
+const { sendWelcomeEmail } = require('../../../utilities/mailer');
 const Register = (req, res) => {
   let errMsg = [];
   if (!req.body.name) {
@@ -81,21 +81,11 @@ const Register = (req, res) => {
           token
           customerobj.save().then(async(customer) => {
 
-            const transporter = nodemailer.createTransport({
-              service: "Gmail",
-              auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS,
-              },
-            });
-            transporter.sendMail({
-              from: '"Our Team" <nikhilxe@gmail.com>', // sender address
-              to: customerobj.email, // list of recipients
-              subject: "Regarding Testing", // subject line
-              text: "Someone Registered with your Email Id", // plain text body
-              html: "<b>Someone Registered with your Email Id</b>", // HTML body
+            sendWelcomeEmail({
+              to: customerobj.email,
+              name: customerobj.name
             }).catch((err) => {
-              console.error("Error while sending mail:", err);
+              console.error("Error sending welcome email:", err);
             });
 
             return res.send({

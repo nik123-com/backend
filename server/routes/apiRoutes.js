@@ -37,12 +37,15 @@ router.get('/', (req, res) => {
 const storage = multer.memoryStorage()
 const upload = multer({ storage: storage })
 
-//Login
+//Login & OTP Auth
 router.post('/category/all', categoryController.all)
 router.post('/brand/all', BrandController.all)
 router.post("/login", userController.login)
+router.post("/send-otp", userController.sendLoginOtp)
+router.post("/verify-otp", userController.verifyOtpLogin)
 router.post("/changePassword", userController.changepassword)
 router.post("/forgotPassword", userController.forgotPassword)
+router.post("/verifyResetOtp", userController.verifyResetOtp)
 router.post("/resetPassword/:token", userController.resetPassword)
 
 //AI integration

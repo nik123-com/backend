@@ -1,8 +1,9 @@
 const orderModel = require("./OrderModel")
-const nodemailer = require("nodemailer");
+const { sendMail, sendOrderConfirmationEmail } = require("../../../utilities/mailer");
 const customerModel = require("../customer/CustomerModel")
 const cartModel = require("../cart/CartModel")
 const productModel = require("../product/ProductModel")
+const userModel = require("../user/userModel")
 
 const addOrder = async (req, res) => {
   try {
@@ -154,31 +155,72 @@ const addOrder = async (req, res) => {
 
     await cartModel.deleteMany({ user_id: req.body.userId })
 
-    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-      const transporter = nodemailer.createTransport({
-        service: "Gmail",
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      })
-      transporter.sendMail({
-        from: '"PrimeNest" <manviv1253@gmail.com>',
-        to: `${customer.email}, nikhilxe@gmail.com`,
-        subject: `Order #${savedOrder.autoId} Confirmed`,
-        html: `
-          <div style="font-family: Arial;">
-            <h2>Order Confirmed</h2>
-            <p>Hi <b>${customer.name || "Customer"}</b>,</p>
-            <p>Your order has been placed successfully.</p>
-            <p><b>Order ID:</b> ${savedOrder.autoId}</p>
-            <p><b>Total Amount:</b> Rs.${grandTotal}</p>
-            <p>We'll notify you once it's shipped.</p>
-            <br/><p>Thanks,<br/>PrimeNest</p>
-          </div>`
+    // Resolve customer registered email and name
+    const userRecord = await userModel.findById(req.body.userId);
+    const customerEmail = (customer?.email || userRecord?.email || "").trim();
+    const customerName = customer?.name || userRecord?.name || "Customer";
+
+    // Prepare item summaries for email notification
+    const emailItems = [];
+    for (let item of cartItems) {
+      let prod = await productModel.findById(item.product_id);
+      if (prod) {
+        emailItems.push({
+          name: prod.name,
+          quantity: item.qty,
+          price: Number(item.price) || Number(prod.price) || 0
+        });
+      }
+    }
+
+    const formattedAddress = addressRecord
+      ? `${addressRecord.houseno || ""}, ${addressRecord.city || ""}, ${addressRecord.state || ""} - ${addressRecord.pin || ""}`.replace(/^[\s,]+|[\s,]+$/g, '')
+      : "";
+
+    const clientUrl = (
+      process.env.CLIENT_URL ||
+      req.headers.origin ||
+      req.headers.referer ||
+      "http://localhost:5173"
+    ).replace(/\/+$/, "");
+
+    // 1. Send confirmation email directly to the customer's registered email
+    if (customerEmail && process.env.SMTP_USER && process.env.SMTP_PASS) {
+      sendOrderConfirmationEmail({
+        to: customerEmail,
+        name: customerName,
+        orderId: savedOrder.autoId,
+        items: emailItems,
+        grandTotal: savedOrder.grandTotal,
+        paymentMethod: savedOrder.paymentMethod,
+        paymentStatus: savedOrder.paymentStatus,
+        address: formattedAddress,
+        portalUrl: `${clientUrl}/myorders`,
       }).catch((err) => {
-        console.error("Email send error:", err)
-      })
+        console.error("Order confirmation email error:", err);
+      });
+    }
+
+    // 2. Depict Order Successfully in Customer Portal (Notification Center)
+    try {
+      const NotificationModel = require('../notification/NotificationModel');
+      await NotificationModel.create({
+        recipientId: req.body.userId,
+        type: 'general',
+        status: 'pending',
+        message: `🎉 Order #${savedOrder.autoId} placed successfully! Total: ₹${savedOrder.grandTotal}. Your order is being processed.`,
+        createdAt: new Date()
+      });
+
+      const io = req.app.get("io");
+      if (io) {
+        io.emit("receive_message", {
+          recipientId: req.body.userId,
+          message: `Order #${savedOrder.autoId} placed successfully!`
+        });
+      }
+    } catch (notifErr) {
+      console.error("Error creating in-app notification:", notifErr);
     }
 
     return res.send({ status: 201, success: true, message: "Order Placed Successfully", data: savedOrder })
@@ -659,16 +701,8 @@ const customerCancelOrder = async (req, res) => {
     // Send email notification if SMTP is configured
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
       try {
-        const transporter = nodemailer.createTransport({
-          service: "Gmail",
-          auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-          },
-        });
-        transporter.sendMail({
-          from: '"PrimeNest" <manviv1253@gmail.com>',
-          to: `${customer.email}`,
+        sendMail({
+          to: customer.email,
           subject: `Order #${order.autoId || order._id} Cancelled`,
           html: `
             <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
