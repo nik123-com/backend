@@ -38,7 +38,7 @@ module.exports = {
 async function registerVendor(req, res) {
     try {
         const {
-            businessName, ownerName, email, password, phone,
+            businessName, ownerName, gender, email, password, phone,
             gstNumber, panNumber, address, bankDetails,
             logo, banner, description, returnPolicy, socialLinks
         } = req.body;
@@ -68,6 +68,7 @@ async function registerVendor(req, res) {
             email: email,
             password: hashedPassword,
             usertype: "3",
+            gender: gender || "",
             isBlocked: false
         });
 
@@ -87,6 +88,7 @@ async function registerVendor(req, res) {
             userId: savedUser._id,
             businessName,
             ownerName,
+            gender: gender || "",
             email,
             phone: phone || "",
             gstNumber: gstNumber || "",
@@ -154,6 +156,10 @@ async function updateVendorProfile(req, res) {
             { $set: updates },
             { new: true }
         );
+
+        if (updates.gender && req.vendor.userId) {
+            await userModel.findByIdAndUpdate(req.vendor.userId, { gender: updates.gender });
+        }
 
         return res.status(200).json({
             success: true,

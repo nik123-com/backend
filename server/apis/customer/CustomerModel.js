@@ -9,6 +9,7 @@ const CustomerSchema = new mongoose.Schema({
     evidence:{type:String, default:""},
     GovtID:{type:String, default:""},
     Address:{type:String, default:""},
+    gender:{type:String, enum:['Male', 'Female', 'Other', ''], default:""},
     status:{type:Boolean, default:true},
     rank:{type:Number, default:null},
     rewardPopupShown:{type:Boolean, default:false},

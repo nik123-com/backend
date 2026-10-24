@@ -35,6 +35,9 @@ const Register = (req, res) => {
   if (!req.body.GovtID) {
     errMsg.push("GovtID is Required");
   }
+  if (!req.body.gender) {
+    errMsg.push("Gender is Required");
+  }
   if (!req.body.password) {
     errMsg.push("password is Required");
   }
@@ -51,8 +54,7 @@ const Register = (req, res) => {
         userobj.name = req.body.name;
         userobj.email = req.body.email;
         userobj.password = bcrypt.hashSync(req.body.password, 10);
-
-
+        userobj.gender = req.body.gender || "";
         userobj.usertype = "2";
         userobj.save().then((userData) => {
 
@@ -61,6 +63,7 @@ const Register = (req, res) => {
             email: userData.email,
             userType: userData.usertype,
             name: userData.name,
+            gender: userobj.gender,
             GovtID: userData.GovtID
           }
           let token = jwt.sign(payload, skey)
@@ -69,6 +72,7 @@ const Register = (req, res) => {
           customerobj.name = req.body.name;
           customerobj.email = req.body.email;
           customerobj.userId = userData._id;
+          customerobj.gender = req.body.gender || "";
           customerobj.Contact = req.body.Contact;
           if (req.body.countryCode) {
             customerobj.countryCode = req.body.countryCode;
@@ -654,7 +658,7 @@ const updateProfile = async (req, res) => {
       return res.status(401).json({ status: 401, success: false, message: "Unauthorized. Please login." });
     }
 
-    const { name, email, Contact, Address, GovtID, currentPassword, newPassword } = req.body;
+    const { name, email, Contact, Address, GovtID, gender, currentPassword, newPassword } = req.body;
 
     const user = await userModel.findById(userId);
     if (!user) {
@@ -729,6 +733,10 @@ const updateProfile = async (req, res) => {
     }
     if (Address !== undefined) customer.Address = Address.trim();
     if (GovtID !== undefined) customer.GovtID = GovtID.trim();
+    if (gender !== undefined) {
+      customer.gender = gender;
+      user.gender = gender;
+    }
 
     // 4. Evidence / ID Proof upload
     if (req.file) {
@@ -776,7 +784,8 @@ const updateProfile = async (req, res) => {
       addedById: user._id,
       email: user.email,
       userType: user.usertype,
-      name: user.name
+      name: user.name,
+      gender: user.gender || customer.gender || ""
     };
     const newToken = jwt.sign(payload, tokenSecret);
 
@@ -792,7 +801,8 @@ const updateProfile = async (req, res) => {
           _id: user._id,
           name: user.name,
           email: user.email,
-          usertype: user.usertype
+          usertype: user.usertype,
+          gender: user.gender || customer.gender || ""
         },
         customer
       }

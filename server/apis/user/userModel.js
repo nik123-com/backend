@@ -5,6 +5,7 @@ const userSchema = new mongoose.Schema({
     email: {type: String, default: ""},
     password: {type: String, default: ""},
     usertype: {type: String, default: ""},
+    gender: {type: String, enum: ['Male', 'Female', 'Other', ''], default: ""},
     isBlocked: {type: Boolean, default: false},
     resetPasswordToken: {type: String},
     resetPasswordExpires: {type: Date},

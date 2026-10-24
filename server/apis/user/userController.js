@@ -1,4 +1,6 @@
 const userModel = require("../user/userModel");
+const CustomerModel = require("../customer/CustomerModel");
+const VendorModel = require("../vendor/VendorModel");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const Joi = require("joi");
@@ -7,7 +9,7 @@ const { sendOtpEmail, sendPasswordResetEmail } = require("../../../utilities/mai
 
 const skey = "SecreteKey";
 
-const login = (req, res) => {
+const login = async (req, res) => {
   if (!req.body.email || !req.body.password) {
     return res.send({
       massage: "Email and password is required",
@@ -16,62 +18,76 @@ const login = (req, res) => {
       status: 403,
     });
   } else {
-    userModel
-      .findOne({ email: req.body.email.trim().toLowerCase() })
-      .then((userData) => {
-        if (userData == null) {
+    try {
+      const userData = await userModel.findOne({ email: req.body.email.trim().toLowerCase() });
+      if (userData == null) {
+        return res.send({
+          massage: "User not found",
+          message: "User not found",
+          success: false,
+          status: 404,
+        });
+      } else if (userData.isBlocked === true) {
+        return res.send({
+          massage: "Your account is blocked. Please contact support.",
+          message: "Your account is blocked. Please contact support.",
+          success: false,
+          status: 403,
+        });
+      } else {
+        let confirm = bcrypt.compareSync(req.body.password, userData.password);
+        if (confirm !== true) {
           return res.send({
-            massage: "User not found",
-            message: "User not found",
+            massage: "Enter the correct Password",
+            message: "Enter the correct Password",
             success: false,
             status: 404,
           });
-        } else if (userData.isBlocked === true) {
-          return res.send({
-            massage: "Your account is blocked. Please contact support.",
-            message: "Your account is blocked. Please contact support.",
-            success: false,
-            status: 403,
-          });
-        } else {
-          let confirm = bcrypt.compareSync(req.body.password, userData.password);
-          let payload = {
-            userId: userData._id,
-            addedById: userData._id,
-            email: userData.email,
-            userType: userData.usertype,
-            name: userData.name,
-          };
-          let token = jwt.sign(payload, skey);
-          if (confirm == true) {
-            return res.send({
-              massage: "Login Successfully",
-              message: "Login Successfully",
-              success: true,
-              status: 200,
-              data: payload,
-              token: token,
-            });
-          } else {
-            return res.send({
-              massage: "Enter the correct Password",
-              message: "Enter the correct Password",
-              success: false,
-              status: 404,
-            });
+        }
+
+        let gender = userData.gender || "";
+        if (!gender) {
+          if (userData.usertype === "2") {
+            const cust = await CustomerModel.findOne({ userId: userData._id });
+            if (cust && cust.gender) gender = cust.gender;
+          } else if (userData.usertype === "3") {
+            const vend = await VendorModel.findOne({ userId: userData._id });
+            if (vend && vend.gender) gender = vend.gender;
+          }
+          if (gender) {
+            userData.gender = gender;
+            await userData.save();
           }
         }
-      })
-      .catch((err) => {
-        console.error("Login DB error:", err);
+
+        let payload = {
+          userId: userData._id,
+          addedById: userData._id,
+          email: userData.email,
+          userType: userData.usertype,
+          name: userData.name,
+          gender: gender,
+        };
+        let token = jwt.sign(payload, skey);
+
         return res.send({
-          massage: "internal server error",
-          message: "Internal server error",
-          success: false,
-          status: 500,
-          err: err,
+          massage: "Login Successfully",
+          message: "Login Successfully",
+          success: true,
+          status: 200,
+          data: payload,
+          token: token,
         });
+      }
+    } catch (err) {
+      console.error("Login DB error:", err);
+      return res.send({
+        massage: "Internal Server Error",
+        message: "Internal Server Error",
+        success: false,
+        status: 500,
       });
+    }
   }
 };
 
@@ -210,6 +226,21 @@ const verifyOtpLogin = async (req, res) => {
     user.otpExpires = undefined;
     await user.save();
 
+    let gender = user.gender || "";
+    if (!gender) {
+      if (user.usertype === "2") {
+        const cust = await CustomerModel.findOne({ userId: user._id });
+        if (cust && cust.gender) gender = cust.gender;
+      } else if (user.usertype === "3") {
+        const vend = await VendorModel.findOne({ userId: user._id });
+        if (vend && vend.gender) gender = vend.gender;
+      }
+      if (gender) {
+        user.gender = gender;
+        await user.save();
+      }
+    }
+
     // Create session token
     const payload = {
       userId: user._id,
@@ -217,6 +248,7 @@ const verifyOtpLogin = async (req, res) => {
       email: user.email,
       userType: user.usertype,
       name: user.name,
+      gender: gender,
     };
     const token = jwt.sign(payload, skey);
 

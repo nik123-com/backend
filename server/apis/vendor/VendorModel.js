@@ -27,6 +27,7 @@ const VendorSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'user', required: true },
     businessName: { type: String, required: true, trim: true },
     ownerName: { type: String, required: true, trim: true },
+    gender: { type: String, enum: ['Male', 'Female', 'Other', ''], default: "" },
     email: { type: String, required: true, trim: true, lowercase: true },
     phone: { type: String, default: "" },
     gstNumber: { type: String, default: "", uppercase: true },
